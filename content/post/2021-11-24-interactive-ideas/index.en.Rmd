@@ -1,0 +1,143 @@
+---
+title: Interactive ideas
+author: Ke Lan
+date: '2021-11-24'
+slug: []
+categories: []
+tags: []
+description: In this week's blog post I will talk about my interactive ideas
+toc: yes
+authors: Ke Lan
+series: []
+lastmod: '2021-11-24T21:45:47-05:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+
+## In this week's blog post I will talk about my interactive ideas
+
+We found our dataset online, and our dataset includes mortgage data: whether one pays off his mortgage or not and other characteristics of this specific mortgage, which enlightens us: whether there is characteristic(s) affect one's inclination to payback the mortgage? Suppose, let's say, when the economy is really really bad, one might not pay back the mortgage because he does not have the ability to do so! So, we want to propose an estimation application:
+
+Here is the code for our interactive ideas. Please note that it will be more contents once we finished our model selection!
+
+This interactive page will present a more straightfoward way for users to examine the distribution of default behavior among different segments: age groups, locations, FICO scores, year, and ltv ratio
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(formattable)
+library(shiny)
+library(plotly)
+mortgage <-read_csv(here::here('dataset','dcr_clean.csv'))
+mortgage$age<- mortgage$time-mortgage$orig_time
+mortgage$TTM<-mortgage$mat_time-mortgage$orig_time
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep='-')
+mortgage_first<-mortgage[match(unique(mortgage$id), mortgage$id),]
+mortgage_first$first_time_date<-mortgage_first$date
+mortgage_first$first_time<-mortgage_first$time
+first <- mortgage_first %>% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+
+
+get_last <- mortgage %>% select(id,date,time,default_time,payoff_time,status_time) %>% group_by(id) %>% summarise_all(last)
+get_last$last_time_date<-get_last$date
+get_last$last_time<-get_last$time
+get_last$status_last<-get_last$status_time
+atlast <- get_last %>% select(id,last_time_date:status_last,default_time)
+meanvalue <- mortgage %>% group_by(id) %>% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+mortgage_all <- first %>% left_join(atlast, by = 'id') %>% left_join(meanvalue, by = 'id')
+year <- mortgage %>% pull(year) %>% unique %>% sort()
+x <- variable.names(mortgage)
+y <- variable.names(mortgage)
+state <- mortgage %>% pull(state_orig_time) %>% unique() %>% sort()
+ui <- navbarPage("My Application",
+                 tabPanel(
+                     "Component 1",
+                     sidebarLayout(
+                         sidebarPanel(
+                             checkboxGroupInput(inputId = "state",
+                                                label = "state",
+                                                choices = state)
+                             ),
+                         mainPanel( plotOutput("distPlot"),verbatimTextOutput("summary") )
+                     )),
+                 tabPanel("Component 2",sidebarLayout(
+                     sidebarPanel(
+                        sliderInput("minage","minage",min = 0,max = 100,value = 0),
+                        sliderInput("maxage","maxage",min = 0,max = 100,value = 100),
+                        sliderInput("minfico","minfico",min = 400,max = 840,value = 400),
+                        sliderInput("maxfico","maxfico",min = 400,max = 840,value = 840),
+                        sliderInput("minltv","minltv",min = 50.1,max = 218.5,value = 50.1),
+                        sliderInput("maxltv","maxltv",min = 50.1,max = 218.5,value = 218.5),
+                        checkboxGroupInput(inputId = "year",
+                                          label = "year",
+                                          choices = year)
+                        ), 
+                     mainPanel( checkboxGroupInput(inputId = "status",
+                                            label = "status",
+                                            choices = c("dafault","payback","haven't reach maturity"),
+                                            selected = c("dafault","payback","haven't reach maturity")),
+                       plotOutput("plot2"))
+                         )),
+                 tabPanel("Component 3")
+)
+
+server <- function(input, output) {
+    output$distPlot <- renderPlot({
+        new <- mortgage %>% filter(state_orig_time %in% input$state) 
+        new <- new %>% group_by(status_time) %>% summarize(count = n())%>% filter(status_time != 0)%>% mutate(status = ifelse(status_time == 1, "dafault", "payback"))
+        ggplot(aes(x = status, y = count),data = new) + geom_bar(stat='identity')
+    })
+   output$summary <- renderPrint({
+       hi <- mortgage %>% filter(state_orig_time %in% input$state) %>% group_by(status_time) %>% summarize(count = n())%>% filter(status_time != 0)%>% mutate(status = ifelse(status_time == 1, "dafault", "payback"))
+       
+       new_default <- hi %>% filter(status_time == 1) %>% pull(count)
+       new_payback <- hi %>% filter(status_time == 2) %>% pull(count)
+       print(paste0("As shown in the graph, the total number of default is: ", new_default, "  the total number of default is: ",
+                                               new_payback))
+    
+ })
+
+
+   
+   output$plot2 <- renderPlot({ 
+      location <-read_csv(here::here('dataset','world_country_and_usa_states_latitude_and_longitude_values.csv'))
+      p <-left_join(mortgage, location, by = c("state_orig_time"="usa_state_code"))
+      p <- p %>% filter(age < input$maxage&age > input$minage) %>% filter(FICO_orig_time< input$maxfico&FICO_orig_time > input$minfico)%>%
+         filter(year %in% input$year) %>%
+         filter(LTV_orig_time< input$maxltv&LTV_orig_time > input$minltv)  %>% 
+        mutate(status = ifelse(status_time == 1,"default", (ifelse(status_time == 2, "payback","haven't reach maturity" )))) %>%
+        filter(status %in% input$status) %>%
+         group_by(state_orig_time) %>% summarize(usa_state_longitude = mean(usa_state_longitude),
+                                                  usa_state_latitude = mean(usa_state_latitude),count = n())
+      
+      epsg_us_equal_area <- 2163
+      
+      us_states <- st_read(here::here("dataset/cb_2019_us_state_20m/cb_2019_us_state_20m.shp"))%>% 
+        st_transform(epsg_us_equal_area)
+      not_contiguous <-
+        c("Guam", "Commonwealth of the Northern Mariana Islands",
+          "American Samoa", "Puerto Rico", "Alaska", "Hawaii",
+          "United States Virgin Islands")
+      
+      us_cont <- us_states %>%
+        filter(!NAME %in% not_contiguous) %>% filter(NAME != "District of Columbia") %>%
+        transmute(STUSPS,STATEFP,NAME, geometry)
+      p <- us_cont %>% inner_join(p, by = c("STUSPS" = "state_orig_time"))
+      ggplot() + 
+        geom_sf(data=p,size=0.1) +
+        geom_sf(data=p,lwd=2,aes(fill=count)) +scale_fill_viridis_b()
+      
+      
+      
+       
+       
+   })
+}
+    
+shinyApp(ui = ui, server = server)
+
+
+
+```

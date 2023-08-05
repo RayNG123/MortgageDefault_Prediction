@@ -1,0 +1,594 @@
+---
+title: "Data"
+description: null
+toc: yes
+featuredVideo: null
+featuredImage: images/1.png
+draft: no
+---
+
+<script src="/rmarkdown-libs/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+
+</div>
+
+<div id="data" class="section level2">
+<h2><strong>Data</strong></h2>
+</div>
+<div id="data-description-and-sources" class="section level2">
+<h2><strong>1 Data Description and Sources</strong></h2>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<div id="basic-description-of-our-main-dataset" class="section level3">
+<h3><strong>1.1 Basic Description of our Main Dataset</strong></h3>
+<p>The data set mortgage is in panel form and reports origination and performance observations for 50,000 residential U.S. mortgage borrowers over 60 periods. The periods has been deidentified by the author.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>To fully see the picture, data sets containing enough observations and dimensions are needed, and to achieve our goals we found this dataset, which records mortgage behaviors from 2000 to 2014.The data set is a randomized selection of mortgage-loan-level data collected from the portfolios underlying U.S. residential mortgage-backed securities (RMBS) securitization portfolios and provided by <a href="www.internationalfinancialresearch.org">International Financial Research</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Before introducing the data, we would like to thank for the author of <em>Roesch, D., &amp; Scheule, H. (2021). Deep Credit Risk: Machine Learning with Python, Amazon</em> to contribute this dataset for us.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Below will be the description for the <a href="http://www.deepcreditrisk.com/data--code.html">Data set</a> that we primarily look at:</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>This data set contains 32 variables and 619660 observations, so it is a huge data set and we will be able to generate some useful insights.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+</div>
+<div id="initial-data-cleaning-and-adding-time-frames" class="section level3">
+<h3><strong>2.1 Initial Data Cleaning and Adding Time Frames</strong></h3>
+<p><span class="math display">\[\\[0.2in]\]</span>
+First of all, we load the dataset and specified the correct format. We then filtered out NA values.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>dcrfull &lt;- read_csv(here::here(&#39;dataset/dcr_full.csv&#39;), col_types=cols(
+  id = col_double(),
+  time = col_double(),
+  orig_time = col_double(),
+  first_time = col_double(),
+  mat_time = col_double(),
+  res_time = col_double(),
+  balance_time = col_double(),
+  LTV_time = col_double(),
+  interest_rate_time = col_double(),
+  rate_time = col_double(),
+  hpi_time = col_double(),
+  gdp_time = col_double(),
+  uer_time = col_double(),
+  REtype_CO_orig_time = col_double(),
+  iREtype_PU_orig_time = col_double(),
+  REtype_SF_orig_time = col_double(),
+  investor_orig_time = col_double(),
+  balance_orig_time = col_double(),
+  FICO_orig_time = col_double(),
+  LTV_orig_time = col_double(),
+  Interest_Rate_orig_time = col_double(),
+  state_orig_time = col_character(),
+  hpi_orig_time = col_double(),
+  default_time = col_double(),
+  payoff_time = col_double(),
+  status_time = col_character()
+))
+
+dcrfull1 &lt;- dcrfull %&gt;% filter(!is.na(state_orig_time))</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span>
+As followed, we observed that our data set only contains deidentified time stamp, which stopped us from joining other dataset. Therefore, we would like to join the actual year and month back to the dataset. The dataset contains US quarterly GDP growth. Therefore, we search online to determine the actual timeframe that corresponds to this period, and join the actual time back to the dataset.
+After the joining process, it is clear that this dataset contains variables across 60 quarters from 2000 to 2014. Below is the process used to join actual time back.
+Here is the link for GDP growth data: (<a href="https://www.multpl.com/us-real-gdp-growth-rate/table/by-quarter" class="uri">https://www.multpl.com/us-real-gdp-growth-rate/table/by-quarter</a>)</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>date_seq&lt;-seq(as.Date(&quot;2000/03/31&quot;), by = &quot;quarter&quot;, length.out = 60)
+date_dataframe&lt;-data.frame(date_seq)
+date_dataframe&lt;- date_dataframe%&gt;%separate(date_seq,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;-&#39;)
+date_dataframe$quater=1
+date_dataframe$quater[date_dataframe$month==&#39;07&#39;]&lt;-2
+date_dataframe$quater[date_dataframe$month==&#39;10&#39;]&lt;-3
+date_dataframe$quater[date_dataframe$month==&#39;12&#39;]&lt;-4
+date_dataframe$time&lt;-seq(1,60,1)
+dcrfull2 &lt;- dcrfull1 %&gt;% left_join(date_dataframe, by = &quot;time&quot;)
+
+mortgage &lt;- dcrfull2</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span>
+Detail Variable Explanation for the original Data set.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<table>
+<colgroup>
+<col width="24%" />
+<col width="75%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Column Name</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">id</td>
+<td align="left">borrower id</td>
+</tr>
+<tr class="even">
+<td align="left">time</td>
+<td align="left">time stamp of observation</td>
+</tr>
+<tr class="odd">
+<td align="left">orig_time</td>
+<td align="left">time stamp for origination</td>
+</tr>
+<tr class="even">
+<td align="left">first_time</td>
+<td align="left">time stamp for first observation</td>
+</tr>
+<tr class="odd">
+<td align="left">mat_time</td>
+<td align="left">time stamp for maturity</td>
+</tr>
+<tr class="even">
+<td align="left">res_time</td>
+<td align="left">time stamp for resolution</td>
+</tr>
+<tr class="odd">
+<td align="left">balance_time</td>
+<td align="left">outstanding balance at observation time</td>
+</tr>
+<tr class="even">
+<td align="left">LTV_time</td>
+<td align="left">loan to value ratio at observation time, in %</td>
+</tr>
+<tr class="odd">
+<td align="left">interest_rate_time</td>
+<td align="left">interest rate at observation time, in %</td>
+</tr>
+<tr class="even">
+<td align="left">hpi_time</td>
+<td align="left">house price index at observation time, base year=100</td>
+</tr>
+<tr class="odd">
+<td align="left">gdp_time</td>
+<td align="left">GDP growth at observation time, in %</td>
+</tr>
+<tr class="even">
+<td align="left">uer_time</td>
+<td align="left">unemployment rate at observation time, in %</td>
+</tr>
+<tr class="odd">
+<td align="left">REtype_CO_orig_time</td>
+<td align="left">real estate type condominium</td>
+</tr>
+<tr class="even">
+<td align="left">REtype_PU_orig_time</td>
+<td align="left">real estate type planned urban developments</td>
+</tr>
+<tr class="odd">
+<td align="left">REtype_SF_orig_time</td>
+<td align="left">single family home</td>
+</tr>
+<tr class="even">
+<td align="left">investor_orig_time</td>
+<td align="left">investor borrower</td>
+</tr>
+<tr class="odd">
+<td align="left">balance_orig_time</td>
+<td align="left">outstanding balance at origination time</td>
+</tr>
+<tr class="even">
+<td align="left">FICO_orig_time</td>
+<td align="left">FICO score at origination time, in %</td>
+</tr>
+<tr class="odd">
+<td align="left">LTV_orig_time</td>
+<td align="left">loan to value ratio at origination time, in %</td>
+</tr>
+<tr class="even">
+<td align="left">Interest_Rate_orig_time</td>
+<td align="left">interest rate at origination time, in %</td>
+</tr>
+<tr class="odd">
+<td align="left">state_orig_time</td>
+<td align="left">US state in which the property is located</td>
+</tr>
+<tr class="even">
+<td align="left">hpi_orig_time</td>
+<td align="left">house price index at observation time, base year=100</td>
+</tr>
+<tr class="odd">
+<td align="left">default_time</td>
+<td align="left">default observation at observation time</td>
+</tr>
+<tr class="even">
+<td align="left">payoff_time</td>
+<td align="left">payoff observation at observation time</td>
+</tr>
+<tr class="odd">
+<td align="left">status_time</td>
+<td align="left">default (1), payoff (2) and non-default/non-payoff (0) at observation time</td>
+</tr>
+</tbody>
+</table>
+<p><span class="math display">\[\\[0.2in]\]</span>
+After all these process, the dataset is cleaned and ready now. We use this dataset to construct our big data page because the panel form dataset contains records for same mortgage over different time frame. In that case, we can monitor the mortgage behaviors from 2000 to 2014 across the global financial crisis, which is presented in our big picture page.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+</div>
+<div id="normalization-of-panel-data-to-build-model" class="section level3">
+<h3>Normalization of Panel Data to Build Model</h3>
+<p>However, to build the model that can measure the default probability of specific mortgages, another problem raised. We have a panel dataset–multiple records refer to a same mortgage over different period. We would not know whether a mortgage is default or payoff until we see last record of this mortgage in the dataset. About 98% of records in our dataset refers to mortgage that are unfinished, which will be useless when constructing the model. Therefore, we would like to normalize the dataset and try to collapse them to build a dataset with have only one record for one mortgage. Before the normalization, there are about 690000 records refer to 50000 mortgages. After the normalization, there are about 50000 records refer to 50000 mortgages. One for each, including their start time, end time, their age,average GDP growth during the mortgage, status at last(default or pay off) and etc. The normalized dataset will be the one we used in EDA and modeling, because it summaries all the behaviors of a mortgage in one record.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Below is our normalizing process:</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Firstly, we would like to determine the starting status of all mortgages, like their start time, their originating interest rate, the house price index at their start time. We also create two new variables, age that records how long did the mortgage actually survive and TTM that records how long did the mortgage scheduled originally. In addition, we also include specific variables that will not change over the time, like their single family status in this process.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>#create a new column for the age of a mortgage
+mortgage$age&lt;- mortgage$time-mortgage$orig_time
+#create a new column for the time to maturity of a mortgage
+mortgage$TTM&lt;-mortgage$mat_time-mortgage$orig_time
+#create a continuous time variable for each records
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep=&#39;-&#39;)
+#found out the first-time record for all mortgages
+mortgage_first&lt;-mortgage[match(unique(mortgage$id), mortgage$id),]
+#create a column for start time of each mortgage
+mortgage_first$first_time_date&lt;-mortgage_first$date
+mortgage_first$first_time&lt;-mortgage_first$time
+#leave only the collumn that contains first time data of the mortgage
+first &lt;- mortgage_first %&gt;% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>As followed, we would like to determine the ending status of each mortgage (default, pay off or unfnished):</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>#Get the last record for all mortgages in the dataset
+get_last &lt;- mortgage %&gt;% select(id,date,time,default_time,payoff_time,status_time) %&gt;% group_by(id) %&gt;% summarise_all(last)
+#determine the end time of a mortgage
+get_last$last_time_date&lt;-get_last$date
+get_last$last_time&lt;-get_last$time
+#determine the status of the mortgage
+get_last$status_last&lt;-get_last$status_time
+atlast &lt;- get_last %&gt;% select(id,last_time_date:status_last,default_time)</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>As followed, we would like to records some continuous variables about a mortgage that will change over time frame. We would like to record their mean value, incluing the mean value GDP growth, Unemployment Rate, Risk_free rate, interest rate, house price index for each mortgage from their start to their end.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>meanvalue &lt;- mortgage %&gt;% group_by(id) %&gt;% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Now We would like to join the three dataset together to form the new dataset with one record for exactly one mortgage:</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>mortgage_all &lt;- first %&gt;% left_join(atlast, by = &#39;id&#39;) %&gt;% left_join(meanvalue, by = &#39;id&#39;)</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Here is the column explanation of our normalized data sets.
+<span class="math display">\[\\[0.2in]\]</span></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Column Name</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">first_time</td>
+<td align="left">time stamp for first observation</td>
+</tr>
+<tr class="even">
+<td align="left">orig_time</td>
+<td align="left">time stamp for origination</td>
+</tr>
+<tr class="odd">
+<td align="left">mat_time</td>
+<td align="left">time stamp for maturity</td>
+</tr>
+<tr class="even">
+<td align="left">rate_time</td>
+<td align="left">risk-free rate at origination time</td>
+</tr>
+<tr class="odd">
+<td align="left">REtype_CO_orig_time</td>
+<td align="left">real estate type condominium</td>
+</tr>
+<tr class="even">
+<td align="left">REtype_PU_orig_time</td>
+<td align="left">real estate type planned urban developments</td>
+</tr>
+<tr class="odd">
+<td align="left">REtype_SF_orig_time</td>
+<td align="left">single family home</td>
+</tr>
+<tr class="even">
+<td align="left">investor_orig_time</td>
+<td align="left">investor borrower</td>
+</tr>
+<tr class="odd">
+<td align="left">balance_orig_time</td>
+<td align="left">outstanding balance at origination time</td>
+</tr>
+<tr class="even">
+<td align="left">FICO_orig_time</td>
+<td align="left">FICO score at origination time, in %</td>
+</tr>
+<tr class="odd">
+<td align="left">LTV_orig_time</td>
+<td align="left">loan to value ratio at origination time, in %</td>
+</tr>
+<tr class="even">
+<td align="left">Interest_Rate_orig_time</td>
+<td align="left">interest rate at origination time, in %</td>
+</tr>
+<tr class="odd">
+<td align="left">state_orig_time</td>
+<td align="left">US state in which the property is located</td>
+</tr>
+<tr class="even">
+<td align="left">hpi_orig_time</td>
+<td align="left">house price index at observation time, base year=100</td>
+</tr>
+<tr class="odd">
+<td align="left">first_time_date</td>
+<td align="left">date of the first observation</td>
+</tr>
+<tr class="even">
+<td align="left">age</td>
+<td align="left">number of periods from origination to time of observation</td>
+</tr>
+<tr class="odd">
+<td align="left">TTM</td>
+<td align="left">time to maturity at the time of observation</td>
+</tr>
+<tr class="even">
+<td align="left">last_time_date</td>
+<td align="left">date of the last observation</td>
+</tr>
+<tr class="odd">
+<td align="left">last_time</td>
+<td align="left">time stamp for the last observation</td>
+</tr>
+<tr class="even">
+<td align="left">status_last</td>
+<td align="left">debt status at the last observation</td>
+</tr>
+<tr class="odd">
+<td align="left">interest_rate_mean</td>
+<td align="left">the average interest rate of all observation periods</td>
+</tr>
+<tr class="even">
+<td align="left">gdp_mean</td>
+<td align="left">the average GDP growth of all observation periods</td>
+</tr>
+<tr class="odd">
+<td align="left">risk_free_mean</td>
+<td align="left">the average risk free rate of all observation periods</td>
+</tr>
+<tr class="even">
+<td align="left">hpi_mean</td>
+<td align="left">the average house price index of all observation periods</td>
+</tr>
+<tr class="odd">
+<td align="left">uer_mean</td>
+<td align="left">the average unemployment rate of all observation periods</td>
+</tr>
+<tr class="even">
+<td align="left">year</td>
+<td align="left">year</td>
+</tr>
+<tr class="odd">
+<td align="left">month</td>
+<td align="left">month</td>
+</tr>
+<tr class="even">
+<td align="left">day</td>
+<td align="left">day</td>
+</tr>
+<tr class="odd">
+<td align="left">quarter</td>
+<td align="left">quarter</td>
+</tr>
+</tbody>
+</table>
+<p><span class="math display">\[\\[0.2in]\]</span>
+This normalized dataset will be used in model construction.</p>
+</div>
+<div id="combine-different-data-sets" class="section level3">
+<h3><strong>2.3 Combine Different Data Sets</strong></h3>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Combine dataset: S&amp;P Index: This data set includes S%P stock market index, which can help us measure the influence of financial market to mortgage default behaviors.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>The SP stock index data set comes from <a href="https://finance.yahoo.com/quote/%5EGSPC/history?p=%5EGSPC">yahoo finance</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Column Name</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Date</td>
+<td align="left">time</td>
+</tr>
+<tr class="even">
+<td align="left">Open</td>
+<td align="left">Opening Stock Index</td>
+</tr>
+<tr class="odd">
+<td align="left">High</td>
+<td align="left">Maximum Stock Index</td>
+</tr>
+<tr class="even">
+<td align="left">Low</td>
+<td align="left">Minimum Stock Index</td>
+</tr>
+<tr class="odd">
+<td align="left">Close</td>
+<td align="left">Closing Stock Index</td>
+</tr>
+<tr class="even">
+<td align="left">Adj</td>
+<td align="left">Adjusted Closing Stock Index</td>
+</tr>
+<tr class="odd">
+<td align="left">Volume</td>
+<td align="left">The Volume of the Whole Stock Market</td>
+</tr>
+</tbody>
+</table>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>SP &lt;- read_csv(here::here(&#39;dataset/Combine Dataset/S&amp;P .csv&#39;))
+SP &lt;- SP %&gt;% mutate(MeanSP = (High + Low)/2) %&gt;% select(Date,Volume,MeanSP) 
+SP$Date &lt;- as.character(SP$Date)
+SP &lt;- SP %&gt;% filter(MeanSP != 1414.070)
+SP &lt;- SP %&gt;% separate(Date,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;-&#39;) %&gt;% arrange(year,month)
+SP$time&lt;- rep(1:60,each = 3)
+SP &lt;- SP %&gt;% group_by(time) %&gt;% summarise(mean_sp = mean(MeanSP),mean_volume = mean(Volume)) </code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span>
+Combine dataset: Dow Jones Real Estate Index: This dataset contains Dow Jones Real Estate Index from 2002 to 2014, which can help us understand how real estate industry are changing.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>The real estate index data set comes from <a href="https://www.investing.com/indices/dj-real-estate">here</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Column Name</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Date</td>
+<td align="left">time</td>
+</tr>
+<tr class="even">
+<td align="left">Price</td>
+<td align="left">the Average Price of Real Estate Stocks</td>
+</tr>
+<tr class="odd">
+<td align="left">Open</td>
+<td align="left">Opening Real Estate Index</td>
+</tr>
+<tr class="even">
+<td align="left">High</td>
+<td align="left">Maximum Real Estate Index</td>
+</tr>
+<tr class="odd">
+<td align="left">Low</td>
+<td align="left">Minimum Real Estate Index</td>
+</tr>
+<tr class="even">
+<td align="left">Vol</td>
+<td align="left">The Volume of the Whole Real Estate Market</td>
+</tr>
+<tr class="odd">
+<td align="left">Change</td>
+<td align="left">The percent of change</td>
+</tr>
+</tbody>
+</table>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>Index &lt;- read_csv(here::here(&#39;dataset/Combine Dataset/DJ Real Estate Data.csv&#39;)) 
+Index &lt;- Index %&gt;% separate(Date,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;/&#39;) %&gt;% filter(year != 2015 &amp; Price != 172.76) 
+Index$time &lt;- rep(50:1,each = 3)
+Index &lt;- Index %&gt;% arrange(time)
+Index$time &lt;- rep(1:50,each = 3)
+Index$time &lt;- Index$time + 10
+Index &lt;- Index %&gt;% group_by(time) %&gt;% summarise(mean_index = mean(Price))</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>Combine dataset-US housing market: We combine data set for New House Construction, House Sales, House Supply, House Inventory, which helps us have a look at the housing market in big picture.</p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>The housing market (start) data set comes from <a href="https://ycharts.com/indicators/us_housing_starts_mom">here</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>The housing market (supply) data set comes from <a href="https://ycharts.com/indicators/us_existing_home_months_supply">here</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>The housing market (start) data set comes from <a href="https://ycharts.com/indicators/us_existing_home_sales">sale</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p>The housing market (inventory) data set comes from <a href="https://ycharts.com/indicators/us_existing_home_inventory">here</a></p>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Column Name</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Date</td>
+<td align="left">time</td>
+</tr>
+<tr class="even">
+<td align="left">Start</td>
+<td align="left">Numbers of House Construction in this period(In Thousands)</td>
+</tr>
+<tr class="odd">
+<td align="left">Sale</td>
+<td align="left">Numbers of House Sold in this period</td>
+</tr>
+<tr class="even">
+<td align="left">Supply</td>
+<td align="left">Numbers of House Supplied in this period(In Million)</td>
+</tr>
+<tr class="odd">
+<td align="left">Inventory</td>
+<td align="left">Numbers of House In Inventory in this period(In Million)</td>
+</tr>
+</tbody>
+</table>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<pre class="r"><code>#Combine dataset: House Start
+Start &lt;- read_csv(here::here(&#39;dataset/Combine Dataset/House start.csv&#39;)) %&gt;% separate(Period,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;-&#39;) 
+names(Start)[4] = c(&#39;house_start&#39;)
+Start &lt;- Start %&gt;% filter(year &gt; 1999 &amp; year &lt; 2015) %&gt;% arrange(year,month)
+Start$time &lt;- rep(1:60,each = 3)
+Start &lt;- Start %&gt;% group_by(time) %&gt;% summarise(house_start = mean(house_start))
+
+#Combine dataset: New House Sales:
+Sales &lt;- read_csv(here::here(&#39;dataset/Combine Dataset/Sales.csv&#39;))  %&gt;% separate(Period,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;-&#39;) 
+names(Sales)[4] = c(&#39;Sales&#39;)
+Sales &lt;- Sales %&gt;% filter(year &gt; 1999 &amp; year &lt; 2015) %&gt;% arrange(year,month)
+Sales$time &lt;- rep(1:60,each = 3)
+Sales &lt;- Sales %&gt;% group_by(time) %&gt;% summarise(Mean_sale = mean(Sales))
+
+#Combine dataset: House Supply:
+Supply &lt;- read_csv(here::here(&#39;dataset/Combine Dataset/Supply.csv&#39;)) %&gt;% separate(Period,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;-&#39;) 
+names(Supply)[4] = c(&#39;Supply&#39;)
+Supply &lt;- Supply %&gt;% filter(year &gt; 1999 &amp; year &lt; 2015) %&gt;% arrange(year,month)
+Supply$time &lt;- rep(1:60,each = 3)
+Supply &lt;- Supply %&gt;% group_by(time) %&gt;% summarise(Mean_supply = mean(Supply))
+
+#Combine dataset: House Inventory:
+Inventory &lt;- read_csv(here::here(&#39;dataset/Combine Dataset/House Inventory.csv&#39;)) %&gt;% separate(Period,into=c(&#39;year&#39;,&#39;month&#39;,&#39;day&#39;),sep=&#39;-&#39;) 
+names(Inventory)[4] = c(&#39;Inventory&#39;)
+Inventory &lt;- Inventory %&gt;% filter(year &gt; 1999 &amp; year &lt; 2015) %&gt;% arrange(year,month)
+Inventory$time &lt;- rep(1:60,each = 3)
+Inventory &lt;- Inventory %&gt;% group_by(time) %&gt;% summarise(Mean_invenotry = mean(Inventory))
+
+#Combine All Combine dataset
+Housing_Market &lt;- Start %&gt;% left_join(Sales, by = &#39;time&#39;) %&gt;% left_join(Supply, by = &#39;time&#39;) %&gt;% left_join(Inventory, by = &#39;time&#39;)
+names(Housing_Market) = c(&#39;time&#39;,&#39;Start&#39;,&#39;Sale&#39;,&#39;Supply&#39;,&#39;Inventory&#39;)
+Housing_Market</code></pre>
+<p><span class="math display">\[\\[0.2in]\]</span>
+Additional Package Used:</p>
+<table>
+<colgroup>
+<col width="19%" />
+<col width="80%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Column Name</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">randomForest</td>
+<td align="left">Consturct randomforst model</td>
+</tr>
+<tr class="even">
+<td align="left">Caret</td>
+<td align="left">Compute variable importance and add predictions to randomforest model</td>
+</tr>
+<tr class="odd">
+<td align="left">InformationValue</td>
+<td align="left">Generate randomized dataset</td>
+</tr>
+<tr class="even">
+<td align="left">glmnet</td>
+<td align="left">Generate Lasso Regression which applies penalization</td>
+</tr>
+</tbody>
+</table>
+<p><span class="math display">\[\\[0.2in]\]</span></p>
+<p><strong>So, by adding time variables and filtering some of the N/A values, we get the data that can draw big picture, and by data normalization, we get data that is suitable for building models. Finally, by considering and evaluating different other potential variables in different data set, we further raise the accuracy of our models. To see the full process of data cleaning, please click</strong></p>
+<p>download <a href="/load_and_clean_data.R">load_and_clean_data.R</a></p>
+</div>
+</div>

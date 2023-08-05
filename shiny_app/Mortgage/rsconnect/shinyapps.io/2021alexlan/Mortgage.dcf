@@ -1,0 +1,13 @@
+name: Mortgage
+title: Mortgage
+username:
+account: 2021alexlan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5206261
+bundleId: 5343712
+url: https://2021alexlan.shinyapps.io/mortgage/
+when: 1638936631.32852
+lastSyncTime: 1638936631.32854
+asMultiple: FALSE
+asStatic: FALSE

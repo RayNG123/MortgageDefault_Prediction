@@ -1,0 +1,426 @@
+---
+title: Further Model Selection and Combining Dataset
+author: Yusen Wu
+date: '2021-11-15'
+slug: []
+categories: []
+tags: []
+description: more about model selection and we will add more variables from other datasets to our model
+toc: yes
+authors: []
+series: []
+lastmod: '2021-11-15T09:45:54-05:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+<script src="{{< blogdown/postref >}}index.en_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+
+</div>
+
+<div id="this-week-we-will-do-more-about-model-selection-and-we-will-add-more-variables-from-other-datasets-to-our-model." class="section level2">
+<h2>This week we will do more about model selection and we will add more variables from other datasets to our model.</h2>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──</code></pre>
+<pre><code>## ✓ ggplot2 3.3.5     ✓ purrr   0.3.4
+## ✓ tibble  3.1.2     ✓ dplyr   1.0.7
+## ✓ tidyr   1.1.4     ✓ stringr 1.4.0
+## ✓ readr   2.0.1     ✓ forcats 0.5.1</code></pre>
+<pre><code>## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(sf)</code></pre>
+<pre><code>## Linking to GEOS 3.8.1, GDAL 3.2.1, PROJ 7.2.1</code></pre>
+<pre class="r"><code>library(tmap)</code></pre>
+<pre><code>## Registered S3 methods overwritten by &#39;stars&#39;:
+##   method             from
+##   st_bbox.SpatRaster sf  
+##   st_crs.SpatRaster  sf</code></pre>
+<pre class="r"><code>library(formattable)
+mortgage &lt;-read_csv(here::here(&#39;dataset&#39;,&#39;dcr_clean.csv&#39;))</code></pre>
+<pre><code>## Rows: 619660 Columns: 32</code></pre>
+<pre><code>## ── Column specification ────────────────────────────────────────────────────────
+## Delimiter: &quot;,&quot;
+## chr  (3): state_orig_time, month, day
+## dbl (29): id, time, orig_time, first_time, mat_time, res_time, balance_time,...</code></pre>
+<pre><code>## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+<pre class="r"><code>mortgage$age&lt;- mortgage$time-mortgage$orig_time
+mortgage$TTM&lt;-mortgage$mat_time-mortgage$orig_time
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep=&#39;-&#39;)
+mortgage_first&lt;-mortgage[match(unique(mortgage$id), mortgage$id),]
+mortgage_first$first_time_date&lt;-mortgage_first$date
+mortgage_first$first_time&lt;-mortgage_first$time
+first &lt;- mortgage_first %&gt;% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+
+get_last &lt;- mortgage %&gt;% select(id,date,time,default_time,payoff_time,status_time) %&gt;% group_by(id) %&gt;% summarise_all(last)
+get_last$last_time_date&lt;-get_last$date
+get_last$last_time&lt;-get_last$time
+get_last$status_last&lt;-get_last$status_time
+atlast &lt;- get_last %&gt;% select(id,last_time_date:status_last,default_time)
+meanvalue &lt;- mortgage %&gt;% group_by(id) %&gt;% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+mortgage_all &lt;- first %&gt;% left_join(atlast, by = &#39;id&#39;) %&gt;% left_join(meanvalue, by = &#39;id&#39;)
+mortgage_all$time_to_GFC &lt;- 37-mortgage_all$first_time</code></pre>
+<pre class="r"><code>library(tidyverse)
+library(caret)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre><code>## 
+## Attaching package: &#39;caret&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:purrr&#39;:
+## 
+##     lift</code></pre>
+<pre class="r"><code>mortgage_select &lt;- mortgage_all %&gt;% select(default_time,rate_time,first_time,gdp_mean,gdp_mean,hpi_orig_time,FICO_orig_time,TTM,interest_rate_mean,age,risk_free_mean)</code></pre>
+<pre class="r"><code>## 普通stepwise
+fullmod = glm(default_time ~.,data = mortgage_select,family=binomial)
+summary(fullmod)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = default_time ~ ., family = binomial, data = mortgage_select)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.6717  -0.7796  -0.4586   0.8650   3.2044  
+## 
+## Coefficients:
+##                      Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)        -3.2067426  0.2414469 -13.281  &lt; 2e-16 ***
+## rate_time           1.6947815  1.6173371   1.048    0.295    
+## first_time         -0.0223649  0.0043960  -5.088 3.63e-07 ***
+## gdp_mean           -0.7985498  0.0130908 -61.001  &lt; 2e-16 ***
+## hpi_orig_time       0.0132781  0.0009223  14.396  &lt; 2e-16 ***
+## FICO_orig_time     -0.0036078  0.0001836 -19.650  &lt; 2e-16 ***
+## TTM                 0.0176525  0.0009626  18.339  &lt; 2e-16 ***
+## interest_rate_mean  0.2832708  0.0079373  35.688  &lt; 2e-16 ***
+## age                -0.0070443  0.0046052  -1.530    0.126    
+## risk_free_mean     -1.7326169  1.6169385  -1.072    0.284    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 61154  on 49819  degrees of freedom
+## Residual deviance: 49256  on 49810  degrees of freedom
+## AIC: 49276
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<pre class="r"><code>nothing &lt;- glm(default_time ~ 1,data = mortgage_select,family=binomial)
+summary(nothing)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = default_time ~ 1, family = binomial, data = mortgage_select)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -0.8504  -0.8504  -0.8504   1.5444   1.5444  
+## 
+## Coefficients:
+##              Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept) -0.831006   0.009745  -85.27   &lt;2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 61154  on 49819  degrees of freedom
+## Residual deviance: 61154  on 49819  degrees of freedom
+## AIC: 61156
+## 
+## Number of Fisher Scoring iterations: 4</code></pre>
+<pre class="r"><code>redmod1 = glm(default_time ~.,data = mortgage_select,family=binomial) 
+backwards = step(fullmod)</code></pre>
+<pre><code>## Start:  AIC=49276.05
+## default_time ~ rate_time + first_time + gdp_mean + hpi_orig_time + 
+##     FICO_orig_time + TTM + interest_rate_mean + age + risk_free_mean
+## 
+##                      Df Deviance   AIC
+## - rate_time           1    49257 49275
+## - risk_free_mean      1    49257 49275
+## &lt;none&gt;                     49256 49276
+## - age                 1    49258 49276
+## - first_time          1    49284 49302
+## - hpi_orig_time       1    49497 49515
+## - TTM                 1    49637 49655
+## - FICO_orig_time      1    49646 49664
+## - interest_rate_mean  1    50612 50630
+## - gdp_mean            1    53496 53514
+## 
+## Step:  AIC=49275.41
+## default_time ~ first_time + gdp_mean + hpi_orig_time + FICO_orig_time + 
+##     TTM + interest_rate_mean + age + risk_free_mean
+## 
+##                      Df Deviance   AIC
+## - risk_free_mean      1    49259 49275
+## &lt;none&gt;                     49257 49275
+## - age                 1    49260 49276
+## - first_time          1    49285 49301
+## - hpi_orig_time       1    49499 49515
+## - TTM                 1    49639 49655
+## - FICO_orig_time      1    49648 49664
+## - interest_rate_mean  1    50615 50631
+## - gdp_mean            1    53498 53514
+## 
+## Step:  AIC=49275.34
+## default_time ~ first_time + gdp_mean + hpi_orig_time + FICO_orig_time + 
+##     TTM + interest_rate_mean + age
+## 
+##                      Df Deviance   AIC
+## &lt;none&gt;                     49259 49275
+## - age                 1    49264 49278
+## - first_time          1    49285 49299
+## - hpi_orig_time       1    49521 49535
+## - TTM                 1    49639 49653
+## - FICO_orig_time      1    49652 49666
+## - interest_rate_mean  1    50678 50692
+## - gdp_mean            1    53852 53866</code></pre>
+<pre class="r"><code>formula(backwards)</code></pre>
+<pre><code>## default_time ~ first_time + gdp_mean + hpi_orig_time + FICO_orig_time + 
+##     TTM + interest_rate_mean + age</code></pre>
+<pre class="r"><code>summary(backwards)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = default_time ~ first_time + gdp_mean + hpi_orig_time + 
+##     FICO_orig_time + TTM + interest_rate_mean + age, family = binomial, 
+##     data = mortgage_select)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.6487  -0.7791  -0.4580   0.8653   3.2055  
+## 
+## Coefficients:
+##                      Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)        -3.3179189  0.2274555 -14.587  &lt; 2e-16 ***
+## first_time         -0.0206038  0.0041977  -4.908 9.19e-07 ***
+## gdp_mean           -0.7933188  0.0125210 -63.359  &lt; 2e-16 ***
+## hpi_orig_time       0.0128981  0.0008786  14.681  &lt; 2e-16 ***
+## FICO_orig_time     -0.0036184  0.0001834 -19.727  &lt; 2e-16 ***
+## TTM                 0.0176275  0.0009622  18.319  &lt; 2e-16 ***
+## interest_rate_mean  0.2805760  0.0076677  36.592  &lt; 2e-16 ***
+## age                -0.0089871  0.0043646  -2.059   0.0395 *  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 61154  on 49819  degrees of freedom
+## Residual deviance: 49259  on 49812  degrees of freedom
+## AIC: 49275
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<pre class="r"><code>back2=glm (default_time ~. - rate_time,data = mortgage_select,family=binomial)
+summary(back2)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = default_time ~ . - rate_time, family = binomial, 
+##     data = mortgage_select)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.6727  -0.7797  -0.4587   0.8651   3.2046  
+## 
+## Coefficients:
+##                      Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)        -3.2051155  0.2414624 -13.274  &lt; 2e-16 ***
+## first_time         -0.0224262  0.0043961  -5.101 3.37e-07 ***
+## gdp_mean           -0.7985790  0.0130907 -61.003  &lt; 2e-16 ***
+## hpi_orig_time       0.0132916  0.0009224  14.410  &lt; 2e-16 ***
+## FICO_orig_time     -0.0036093  0.0001836 -19.659  &lt; 2e-16 ***
+## TTM                 0.0176600  0.0009626  18.345  &lt; 2e-16 ***
+## interest_rate_mean  0.2833832  0.0079369  35.704  &lt; 2e-16 ***
+## age                -0.0069701  0.0046050  -1.514    0.130    
+## risk_free_mean     -0.0387074  0.0278969  -1.388    0.165    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 61154  on 49819  degrees of freedom
+## Residual deviance: 49257  on 49811  degrees of freedom
+## AIC: 49275
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<pre class="r"><code>forwards = step(nothing, scope=list(default=formula(nothing),upper=formula(fullmod)), direction=&quot;forward&quot;)</code></pre>
+<pre><code>## Start:  AIC=61155.51
+## default_time ~ 1
+## 
+##                      Df Deviance   AIC
+## + gdp_mean            1    53746 53750
+## + hpi_orig_time       1    57460 57464
+## + interest_rate_mean  1    59151 59155
+## + rate_time           1    60008 60012
+## + risk_free_mean      1    60010 60014
+## + TTM                 1    60416 60420
+## + first_time          1    60431 60435
+## + FICO_orig_time      1    60559 60563
+## + age                 1    60564 60568
+## &lt;none&gt;                     61154 61156
+## 
+## Step:  AIC=53749.83
+## default_time ~ gdp_mean
+## 
+##                      Df Deviance   AIC
+## + interest_rate_mean  1    51336 51342
+## + FICO_orig_time      1    52213 52219
+## + hpi_orig_time       1    53167 53173
+## + TTM                 1    53240 53246
+## + age                 1    53261 53267
+## + rate_time           1    53591 53597
+## + risk_free_mean      1    53592 53598
+## + first_time          1    53729 53735
+## &lt;none&gt;                     53746 53750
+## 
+## Step:  AIC=51342.26
+## default_time ~ gdp_mean + interest_rate_mean
+## 
+##                  Df Deviance   AIC
+## + hpi_orig_time   1    50229 50237
+## + TTM             1    50584 50592
+## + age             1    50739 50747
+## + FICO_orig_time  1    51016 51024
+## + first_time      1    51318 51326
+## &lt;none&gt;                 51336 51342
+## + risk_free_mean  1    51335 51343
+## + rate_time       1    51335 51343
+## 
+## Step:  AIC=50237.27
+## default_time ~ gdp_mean + interest_rate_mean + hpi_orig_time
+## 
+##                  Df Deviance   AIC
+## + TTM             1    49786 49796
+## + FICO_orig_time  1    49871 49881
+## + first_time      1    50070 50080
+## + age             1    50095 50105
+## &lt;none&gt;                 50229 50237
+## + risk_free_mean  1    50227 50237
+## + rate_time       1    50227 50237
+## 
+## Step:  AIC=49795.51
+## default_time ~ gdp_mean + interest_rate_mean + hpi_orig_time + 
+##     TTM
+## 
+##                  Df Deviance   AIC
+## + FICO_orig_time  1    49458 49470
+## + first_time      1    49655 49667
+## + age             1    49672 49684
+## + risk_free_mean  1    49782 49794
+## + rate_time       1    49782 49794
+## &lt;none&gt;                 49786 49796
+## 
+## Step:  AIC=49470.42
+## default_time ~ gdp_mean + interest_rate_mean + hpi_orig_time + 
+##     TTM + FICO_orig_time
+## 
+##                  Df Deviance   AIC
+## + first_time      1    49264 49278
+## + age             1    49285 49299
+## + risk_free_mean  1    49456 49470
+## + rate_time       1    49456 49470
+## &lt;none&gt;                 49458 49470
+## 
+## Step:  AIC=49277.54
+## default_time ~ gdp_mean + interest_rate_mean + hpi_orig_time + 
+##     TTM + FICO_orig_time + first_time
+## 
+##                  Df Deviance   AIC
+## + age             1    49259 49275
+## + risk_free_mean  1    49260 49276
+## + rate_time       1    49260 49276
+## &lt;none&gt;                 49264 49278
+## 
+## Step:  AIC=49275.34
+## default_time ~ gdp_mean + interest_rate_mean + hpi_orig_time + 
+##     TTM + FICO_orig_time + first_time + age
+## 
+##                  Df Deviance   AIC
+## &lt;none&gt;                 49259 49275
+## + risk_free_mean  1    49257 49275
+## + rate_time       1    49257 49275</code></pre>
+<pre class="r"><code>formula(redmod1)</code></pre>
+<pre><code>## default_time ~ rate_time + first_time + gdp_mean + hpi_orig_time + 
+##     FICO_orig_time + TTM + interest_rate_mean + age + risk_free_mean</code></pre>
+<pre class="r"><code>formula(backwards)</code></pre>
+<pre><code>## default_time ~ first_time + gdp_mean + hpi_orig_time + FICO_orig_time + 
+##     TTM + interest_rate_mean + age</code></pre>
+<pre class="r"><code>formula(forwards)</code></pre>
+<pre><code>## default_time ~ gdp_mean + interest_rate_mean + hpi_orig_time + 
+##     TTM + FICO_orig_time + first_time + age</code></pre>
+<pre class="r"><code>library(pROC)</code></pre>
+<pre><code>## Type &#39;citation(&quot;pROC&quot;)&#39; for a citation.</code></pre>
+<pre><code>## 
+## Attaching package: &#39;pROC&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     cov, smooth, var</code></pre>
+<pre class="r"><code>library(tidyverse)
+library(modelr)
+mortgage_all &lt;- mortgage_all %&gt;% add_predictions(backwards, type = &#39;response&#39;)
+roc(mortgage_all$default_time,mortgage_all$pred,plot = TRUE)</code></pre>
+<pre><code>## Setting levels: control = 0, case = 1</code></pre>
+<pre><code>## Setting direction: controls &lt; cases</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-5-1.png" width="672" /></p>
+<pre><code>## 
+## Call:
+## roc.default(response = mortgage_all$default_time, predictor = mortgage_all$pred,     plot = TRUE)
+## 
+## Data: mortgage_all$pred in 34703 controls (mortgage_all$default_time 0) &lt; 15117 cases (mortgage_all$default_time 1).
+## Area under the curve: 0.7948</code></pre>
+<pre class="r"><code>library(pROC)
+model &lt;- glm(default_time ~ age + first_time+REtype_SF_orig_time+interest_rate_mean+gdp_mean+rate_time+hpi_orig_time+uer_mean+investor_orig_time+FICO_orig_time+LTV_orig_time+TTM , data = mortgage_all, family = binomial) 
+mortgage_all &lt;- mortgage_all %&gt;% add_predictions(model, type = &#39;response&#39;)
+roc(mortgage_all$default_time,mortgage_all$pred,plot = TRUE)</code></pre>
+<pre><code>## Setting levels: control = 0, case = 1</code></pre>
+<pre><code>## Setting direction: controls &lt; cases</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+<pre><code>## 
+## Call:
+## roc.default(response = mortgage_all$default_time, predictor = mortgage_all$pred,     plot = TRUE)
+## 
+## Data: mortgage_all$pred in 34703 controls (mortgage_all$default_time 0) &lt; 15117 cases (mortgage_all$default_time 1).
+## Area under the curve: 0.8203</code></pre>
+<pre class="r"><code>fit &lt;-  leaps::regsubsets(default_time ~ age + first_time+REtype_SF_orig_time+interest_rate_mean+gdp_mean+rate_time+hpi_orig_time+uer_mean+investor_orig_time+FICO_orig_time+LTV_orig_time+TTM, method = &quot;forward&quot;,data= mortgage_all, nvmax = 10)
+summary(fit)$which</code></pre>
+<pre><code>##    (Intercept)   age first_time REtype_SF_orig_time interest_rate_mean gdp_mean
+## 1         TRUE FALSE      FALSE               FALSE              FALSE     TRUE
+## 2         TRUE FALSE      FALSE               FALSE              FALSE     TRUE
+## 3         TRUE FALSE      FALSE               FALSE              FALSE     TRUE
+## 4         TRUE FALSE      FALSE               FALSE              FALSE     TRUE
+## 5         TRUE  TRUE      FALSE               FALSE              FALSE     TRUE
+## 6         TRUE  TRUE      FALSE               FALSE               TRUE     TRUE
+## 7         TRUE  TRUE      FALSE               FALSE               TRUE     TRUE
+## 8         TRUE  TRUE       TRUE               FALSE               TRUE     TRUE
+## 9         TRUE  TRUE       TRUE               FALSE               TRUE     TRUE
+## 10        TRUE  TRUE       TRUE                TRUE               TRUE     TRUE
+##    rate_time hpi_orig_time uer_mean investor_orig_time FICO_orig_time
+## 1      FALSE         FALSE    FALSE              FALSE          FALSE
+## 2      FALSE         FALSE     TRUE              FALSE          FALSE
+## 3      FALSE         FALSE     TRUE              FALSE           TRUE
+## 4      FALSE         FALSE     TRUE              FALSE           TRUE
+## 5      FALSE         FALSE     TRUE              FALSE           TRUE
+## 6      FALSE         FALSE     TRUE              FALSE           TRUE
+## 7      FALSE         FALSE     TRUE              FALSE           TRUE
+## 8      FALSE         FALSE     TRUE              FALSE           TRUE
+## 9      FALSE         FALSE     TRUE               TRUE           TRUE
+## 10     FALSE         FALSE     TRUE               TRUE           TRUE
+##    LTV_orig_time   TTM
+## 1          FALSE FALSE
+## 2          FALSE FALSE
+## 3          FALSE FALSE
+## 4           TRUE FALSE
+## 5           TRUE FALSE
+## 6           TRUE FALSE
+## 7           TRUE  TRUE
+## 8           TRUE  TRUE
+## 9           TRUE  TRUE
+## 10          TRUE  TRUE</code></pre>
+<pre class="r"><code>summary(fit)$bic</code></pre>
+<pre><code>##  [1]  -7596.947 -11847.708 -13043.437 -13474.537 -13727.848 -13937.529
+##  [7] -14207.649 -14355.493 -14408.570 -14411.618</code></pre>
+<pre class="r"><code>summary(fit)$cp</code></pre>
+<pre><code>##  [1] 7408.00466 2718.60252 1463.64526 1012.82920  746.09844  524.84629
+##  [7]  243.82847   86.69563   24.75533   12.89255</code></pre>
+<pre class="r"><code>summary(fit)$rsq</code></pre>
+<pre><code>##  [1] 0.1418034 0.2121611 0.2310118 0.2378028 0.2418330 0.2451811 0.2494256
+##  [8] 0.2518121 0.2527710 0.2529789</code></pre>
+</div>

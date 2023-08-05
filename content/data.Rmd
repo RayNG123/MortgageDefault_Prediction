@@ -1,0 +1,442 @@
+---
+title: "Data"
+description: null
+toc: yes
+featuredVideo: null
+featuredImage: images/1.png
+draft: no
+---
+## __Data__
+
+## __1 Data Description and Sources__
+
+$$\\[0.2in]$$
+
+### __1.1 Basic Description of our Main Dataset__
+The data set mortgage is in panel form and reports origination and performance observations for 50,000 residential U.S. mortgage borrowers over 60 periods. The periods has been deidentified by the author.
+
+$$\\[0.2in]$$
+
+To fully see the picture, data sets containing enough observations and dimensions are needed, and to achieve our goals we found this dataset, which records mortgage behaviors from 2000 to 2014.The data set is a randomized selection of mortgage-loan-level data collected from the portfolios underlying U.S. residential mortgage-backed securities (RMBS) securitization portfolios and provided by [International Financial Research](www.internationalfinancialresearch.org)
+
+$$\\[0.2in]$$
+
+Before introducing the data, we would like to thank for the author of _Roesch, D., & Scheule, H. (2021). Deep Credit Risk: Machine Learning with Python, Amazon_ to contribute this dataset for us. 
+
+$$\\[0.2in]$$
+
+Below will be the description for the [Data set](http://www.deepcreditrisk.com/data--code.html) that we primarily look at: 
+
+$$\\[0.2in]$$
+
+This data set contains 32 variables and 619660 observations, so it is a huge data set and we will be able to generate some useful insights. 
+
+$$\\[0.2in]$$
+
+### __2.1 Initial Data Cleaning and Adding Time Frames__
+
+$$\\[0.2in]$$
+First of all, we load the dataset and specified the correct format. We then filtered out NA values.
+
+$$\\[0.2in]$$
+
+```{r echo = FALSE,results='hide',message = FALSE,warning = FALSE}
+library(tidyverse)
+```
+
+$$\\[0.2in]$$
+
+```{r results='hide',message = FALSE,warning = FALSE}
+dcrfull <- read_csv(here::here('dataset/dcr_full.csv'), col_types=cols(
+  id = col_double(),
+  time = col_double(),
+  orig_time = col_double(),
+  first_time = col_double(),
+  mat_time = col_double(),
+  res_time = col_double(),
+  balance_time = col_double(),
+  LTV_time = col_double(),
+  interest_rate_time = col_double(),
+  rate_time = col_double(),
+  hpi_time = col_double(),
+  gdp_time = col_double(),
+  uer_time = col_double(),
+  REtype_CO_orig_time = col_double(),
+  iREtype_PU_orig_time = col_double(),
+  REtype_SF_orig_time = col_double(),
+  investor_orig_time = col_double(),
+  balance_orig_time = col_double(),
+  FICO_orig_time = col_double(),
+  LTV_orig_time = col_double(),
+  Interest_Rate_orig_time = col_double(),
+  state_orig_time = col_character(),
+  hpi_orig_time = col_double(),
+  default_time = col_double(),
+  payoff_time = col_double(),
+  status_time = col_character()
+))
+
+dcrfull1 <- dcrfull %>% filter(!is.na(state_orig_time))
+
+```
+
+$$\\[0.2in]$$
+As followed, we observed that our data set only contains deidentified time stamp, which stopped us from joining other dataset. Therefore, we would like to join the actual year and month back to the dataset. The dataset contains US quarterly GDP growth. Therefore, we search online to determine the actual timeframe that corresponds to this period, and join the actual time back to the dataset.
+ After the joining process, it is clear that this dataset contains variables across 60 quarters from 2000 to 2014. Below is the process used to join actual time back.
+Here is the link for GDP growth data: (https://www.multpl.com/us-real-gdp-growth-rate/table/by-quarter)
+
+$$\\[0.2in]$$
+
+```{r results='hide',message = FALSE,warning = FALSE}
+date_seq<-seq(as.Date("2000/03/31"), by = "quarter", length.out = 60)
+date_dataframe<-data.frame(date_seq)
+date_dataframe<- date_dataframe%>%separate(date_seq,into=c('year','month','day'),sep='-')
+date_dataframe$quater=1
+date_dataframe$quater[date_dataframe$month=='07']<-2
+date_dataframe$quater[date_dataframe$month=='10']<-3
+date_dataframe$quater[date_dataframe$month=='12']<-4
+date_dataframe$time<-seq(1,60,1)
+dcrfull2 <- dcrfull1 %>% left_join(date_dataframe, by = "time")
+
+mortgage <- dcrfull2
+```
+$$\\[0.2in]$$
+Detail Variable Explanation for the original Data set.
+
+$$\\[0.2in]$$
+```{r echo = FALSE,message = FALSE,warning = FALSE}
+
+newstr<-'id: borrower id
+time: time stamp of observation
+orig_time: time stamp for origination
+first_time: time stamp for first observation
+mat_time: time stamp for maturity
+res_time: time stamp for resolution
+balance_time: outstanding balance at observation time
+LTV_time: loan to value ratio at observation time, in %
+interest_rate_time: interest rate at observation time, in %
+hpi_time: house price index at observation time, base year=100
+gdp_time: GDP growth at observation time, in %
+uer_time: unemployment rate at observation time, in %
+REtype_CO_orig_time: real estate type condominium: 1, otherwise: 0
+REtype_PU_orig_time: real estate type planned urban developments: 1, otherwise: 0
+REtype_SF_orig_time: single family home: 1, otherwise: 0
+investor_orig_time: investor borrower: 1, otherwise: 0
+balance_orig_time: outstanding balance at origination time
+FICO_orig_time: FICO score at origination time, in %
+LTV_orig_time: loan to value ratio at origination time, in %
+Interest_Rate_orig_time: interest rate at origination time, in %
+state_orig_time: US state in which the property is located
+hpi_orig_time: house price index at observation time, base year=100
+default_time: default observation at observation time
+payoff_time: payoff observation at observation time
+status_time: default (1), payoff (2) and non-default/non-payoff (0) at observation time'
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as_tibble(keydataname) %>%knitr::kable()
+```
+
+$$\\[0.2in]$$
+After all these process, the dataset is cleaned and ready now. We use this dataset to construct our big data page because the panel form dataset contains records for same mortgage over different time frame. In that case, we can monitor the mortgage behaviors from 2000 to 2014 across the global financial crisis, which is presented in our big picture page.
+
+$$\\[0.2in]$$
+
+
+### Normalization of Panel Data to Build Model
+
+However, to build the model that can measure the default probability of specific mortgages, another problem raised. We have a panel dataset--multiple records refer to a same mortgage over different period. We would not know whether a mortgage is default or payoff until we see last record of this mortgage in the dataset. About 98% of records in our dataset refers to mortgage that are unfinished, which will be useless when constructing the model. Therefore, we would like to normalize the dataset and try to collapse them to build a dataset with have only one record for one mortgage. Before the normalization, there are about 690000 records refer to 50000 mortgages. After the normalization, there are about 50000 records refer to 50000 mortgages. One for each, including their start time, end time, their age,average GDP growth during the mortgage, status at last(default or pay off) and etc. The normalized dataset will be the one we used in EDA and modeling, because it summaries all the behaviors of a mortgage in one record.
+
+$$\\[0.2in]$$
+
+Below is our normalizing process:
+
+$$\\[0.2in]$$
+
+Firstly, we would like to determine the starting status of all mortgages, like their start time, their originating interest rate, the house price index at their start time. We also create two new variables, age that records how long did the mortgage actually survive and TTM that records how long did the mortgage scheduled originally. In addition, we also include specific variables that will not change over the time, like their single family status in this process.
+
+
+$$\\[0.2in]$$
+```{r results='hide',message = FALSE,warning = FALSE}
+#create a new column for the age of a mortgage
+mortgage$age<- mortgage$time-mortgage$orig_time
+#create a new column for the time to maturity of a mortgage
+mortgage$TTM<-mortgage$mat_time-mortgage$orig_time
+#create a continuous time variable for each records
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep='-')
+#found out the first-time record for all mortgages
+mortgage_first<-mortgage[match(unique(mortgage$id), mortgage$id),]
+#create a column for start time of each mortgage
+mortgage_first$first_time_date<-mortgage_first$date
+mortgage_first$first_time<-mortgage_first$time
+#leave only the collumn that contains first time data of the mortgage
+first <- mortgage_first %>% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+```
+
+$$\\[0.2in]$$
+
+As followed, we would like to determine the ending status of each mortgage (default, pay off or unfnished):
+
+$$\\[0.2in]$$
+
+```{r results='hide',message = FALSE,warning = FALSE}
+#Get the last record for all mortgages in the dataset
+get_last <- mortgage %>% select(id,date,time,default_time,payoff_time,status_time) %>% group_by(id) %>% summarise_all(last)
+#determine the end time of a mortgage
+get_last$last_time_date<-get_last$date
+get_last$last_time<-get_last$time
+#determine the status of the mortgage
+get_last$status_last<-get_last$status_time
+atlast <- get_last %>% select(id,last_time_date:status_last,default_time)
+```
+
+$$\\[0.2in]$$
+
+As followed, we would like to records some continuous variables about a mortgage that will change over time frame. We would like to record their mean value, incluing the mean value GDP growth, Unemployment Rate, Risk_free rate, interest rate, house price index for each mortgage from their start to their end.
+
+$$\\[0.2in]$$
+
+```{r results='hide',message = FALSE,warning = FALSE}
+meanvalue <- mortgage %>% group_by(id) %>% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+```
+
+$$\\[0.2in]$$
+
+Now We would like to join the three dataset together to form the new dataset with one record for exactly one mortgage:
+
+$$\\[0.2in]$$
+
+```{r result = 'hide'}
+mortgage_all <- first %>% left_join(atlast, by = 'id') %>% left_join(meanvalue, by = 'id')
+```
+
+$$\\[0.2in]$$
+
+Here is the column explanation of our normalized data sets.
+$$\\[0.2in]$$
+```{r echo = FALSE,message = FALSE,warning = FALSE}
+
+newstr<-'first_time: time stamp for first observation
+orig_time: time stamp for origination
+mat_time: time stamp for maturity
+rate_time: risk-free rate at origination time
+REtype_CO_orig_time: real estate type condominium: 1, otherwise: 0
+REtype_PU_orig_time: real estate type planned urban developments: 1, otherwise: 0
+REtype_SF_orig_time: single family home: 1, otherwise: 0
+investor_orig_time: investor borrower: 1, otherwise: 0
+balance_orig_time: outstanding balance at origination time
+FICO_orig_time: FICO score at origination time, in %
+LTV_orig_time: loan to value ratio at origination time, in %
+Interest_Rate_orig_time: interest rate at origination time, in %
+state_orig_time: US state in which the property is located
+hpi_orig_time: house price index at observation time, base year=100
+first_time_date: date of the first observation
+age: number of periods from origination to time of observation
+TTM: time to maturity at the time of observation
+last_time_date: date of the last observation
+last_time: time stamp for the last observation
+status_last: debt status at the last observation: 0 is unfinished, 1 is default, 2 is paidoff
+interest_rate_mean: the average interest rate of all observation periods
+gdp_mean: the average GDP growth of all observation periods
+risk_free_mean: the average risk free rate of all observation periods
+hpi_mean: the average house price index of all observation periods
+uer_mean: the average unemployment rate of all observation periods
+year: year
+month: month
+day: day
+quarter: quarter'
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as_tibble(keydataname) %>%knitr::kable()
+
+```
+
+$$\\[0.2in]$$
+This normalized dataset will be used in model construction. 
+
+
+### __2.3 Combine Different Data Sets__
+
+$$\\[0.2in]$$
+
+Combine dataset: S&P Index: This data set includes S%P stock market index, which can help us measure the influence of financial market to mortgage default behaviors.
+
+$$\\[0.2in]$$
+
+The SP stock index data set comes from [yahoo finance](https://finance.yahoo.com/quote/%5EGSPC/history?p=%5EGSPC)
+
+$$\\[0.2in]$$
+
+
+
+```{r echo =FALSE,message = FALSE,warning = FALSE}
+newstr<-'Date: time
+Open: Opening Stock Index
+High: Maximum Stock Index
+Low: Minimum Stock Index
+Close: Closing Stock Index
+Adj: Adjusted Closing Stock Index
+Volume: The Volume of the Whole Stock Market'
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as_tibble(keydataname) %>%knitr::kable()
+```
+
+$$\\[0.2in]$$
+
+```{r results='hide',message = FALSE,warning = FALSE}
+
+SP <- read_csv(here::here('dataset/Combine Dataset/S&P .csv'))
+SP <- SP %>% mutate(MeanSP = (High + Low)/2) %>% select(Date,Volume,MeanSP) 
+SP$Date <- as.character(SP$Date)
+SP <- SP %>% filter(MeanSP != 1414.070)
+SP <- SP %>% separate(Date,into=c('year','month','day'),sep='-') %>% arrange(year,month)
+SP$time<- rep(1:60,each = 3)
+SP <- SP %>% group_by(time) %>% summarise(mean_sp = mean(MeanSP),mean_volume = mean(Volume)) 
+```
+
+$$\\[0.2in]$$
+Combine dataset: Dow Jones Real Estate Index: This dataset contains Dow Jones Real Estate Index from 2002 to 2014, which can help us understand how real estate industry are changing.
+
+
+$$\\[0.2in]$$
+
+The real estate index data set comes from [here](https://www.investing.com/indices/dj-real-estate)
+
+$$\\[0.2in]$$
+
+```{r echo =FALSE,message = FALSE,warning = FALSE}
+newstr<-'Date: time
+Price: the Average Price of Real Estate Stocks
+Open: Opening Real Estate Index
+High: Maximum Real Estate Index
+Low: Minimum Real Estate Index
+Vol: The Volume of the Whole Real Estate Market
+Change: The percent of change'
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as_tibble(keydataname) %>%knitr::kable()
+```
+
+$$\\[0.2in]$$
+
+```{r results='hide',message = FALSE,warning = FALSE}
+Index <- read_csv(here::here('dataset/Combine Dataset/DJ Real Estate Data.csv')) 
+Index <- Index %>% separate(Date,into=c('year','month','day'),sep='/') %>% filter(year != 2015 & Price != 172.76) 
+Index$time <- rep(50:1,each = 3)
+Index <- Index %>% arrange(time)
+Index$time <- rep(1:50,each = 3)
+Index$time <- Index$time + 10
+Index <- Index %>% group_by(time) %>% summarise(mean_index = mean(Price))
+
+```
+
+$$\\[0.2in]$$
+
+
+
+
+Combine dataset-US housing market: We combine data set for New House Construction, House Sales, House Supply, House Inventory, which helps us have a look at the housing market in big picture.
+
+
+$$\\[0.2in]$$
+
+The housing market (start) data set comes from [here](https://ycharts.com/indicators/us_housing_starts_mom)
+
+$$\\[0.2in]$$
+
+The housing market (supply) data set comes from [here](https://ycharts.com/indicators/us_existing_home_months_supply)
+
+$$\\[0.2in]$$
+
+
+The housing market (start) data set comes from [sale](https://ycharts.com/indicators/us_existing_home_sales)
+
+$$\\[0.2in]$$
+
+
+The housing market (inventory) data set comes from [here](https://ycharts.com/indicators/us_existing_home_inventory)
+
+
+$$\\[0.2in]$$
+
+
+
+```{r echo =FALSE,message = FALSE,warning = FALSE}
+newstr<-'Date: time
+Start: Numbers of House Construction in this period(In Thousands)
+Sale:  Numbers of House Sold in this period
+Supply: Numbers of House Supplied in this period(In Million)
+Inventory: Numbers of House In Inventory in this period(In Million)'
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as_tibble(keydataname) %>%knitr::kable()
+```
+
+$$\\[0.2in]$$
+
+
+```{r results='hide',message = FALSE,warning = FALSE}
+#Combine dataset: House Start
+Start <- read_csv(here::here('dataset/Combine Dataset/House start.csv')) %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Start)[4] = c('house_start')
+Start <- Start %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Start$time <- rep(1:60,each = 3)
+Start <- Start %>% group_by(time) %>% summarise(house_start = mean(house_start))
+
+#Combine dataset: New House Sales:
+Sales <- read_csv(here::here('dataset/Combine Dataset/Sales.csv'))  %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Sales)[4] = c('Sales')
+Sales <- Sales %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Sales$time <- rep(1:60,each = 3)
+Sales <- Sales %>% group_by(time) %>% summarise(Mean_sale = mean(Sales))
+
+#Combine dataset: House Supply:
+Supply <- read_csv(here::here('dataset/Combine Dataset/Supply.csv')) %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Supply)[4] = c('Supply')
+Supply <- Supply %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Supply$time <- rep(1:60,each = 3)
+Supply <- Supply %>% group_by(time) %>% summarise(Mean_supply = mean(Supply))
+
+#Combine dataset: House Inventory:
+Inventory <- read_csv(here::here('dataset/Combine Dataset/House Inventory.csv')) %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Inventory)[4] = c('Inventory')
+Inventory <- Inventory %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Inventory$time <- rep(1:60,each = 3)
+Inventory <- Inventory %>% group_by(time) %>% summarise(Mean_invenotry = mean(Inventory))
+
+#Combine All Combine dataset
+Housing_Market <- Start %>% left_join(Sales, by = 'time') %>% left_join(Supply, by = 'time') %>% left_join(Inventory, by = 'time')
+names(Housing_Market) = c('time','Start','Sale','Supply','Inventory')
+Housing_Market
+```
+
+$$\\[0.2in]$$
+Additional Package Used:
+
+```{r echo=FALSE,message = FALSE,warning = FALSE}
+newstr<-'randomForest: Consturct randomforst model
+Caret: Compute variable importance and add predictions to randomforest model
+InformationValue: Generate randomized dataset
+glmnet: Generate Lasso Regression which applies penalization'
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as_tibble(keydataname) %>%knitr::kable()
+```
+
+$$\\[0.2in]$$
+
+__So, by adding time variables and filtering some of the N/A values, we get the data that can draw big picture, and by data normalization, we get data that is suitable for building models. Finally, by considering and evaluating different other potential variables in different data set, we further raise the accuracy of our models. To see the full process of data cleaning, please click__ 
+
+download [load_and_clean_data.R](/load_and_clean_data.R)

@@ -1,0 +1,164 @@
+---
+title: Exploratory Data Analysis 2
+author: Yusen Wu
+date: '2021-11-03'
+slug: []
+categories: []
+tags: []
+description: our continuing efforts in exploratory data analysis
+toc: yes
+authors: []
+series: []
+lastmod: '2021-11-03T09:21:37-04:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+<script src="{{< blogdown/postref >}}index.en_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+
+</div>
+
+<div id="for-this-weeks-blog-post-we-would-like-to-describe-our-continuing-efforts-in-exploratory-data-analysis.-this-week-we-will-try-to-do-a-deeper-analysis-and-also-try-to-put-together-more-polished-figures." class="section level2">
+<h2>For this week’s blog post, we would like to describe our continuing efforts in exploratory data analysis. This week, we will try to do a deeper analysis and also try to put together more polished figures.</h2>
+</div>
+<div id="for-this-weeks-blog-post-we-would-like-to-describe-our-continuing-efforts-in-exploratory-data-analysis.-this-week-we-will-try-to-do-a-deeper-analysis-and-also-try-to-put-together-more-polished-figures.-1" class="section level2">
+<h2>For this week’s blog post, we would like to describe our continuing efforts in exploratory data analysis. This week, we will try to do a deeper analysis and also try to put together more polished figures.</h2>
+<p>For EDA analysis, we start by loading the cleaned dataset:</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──</code></pre>
+<pre><code>## ✓ ggplot2 3.3.5     ✓ purrr   0.3.4
+## ✓ tibble  3.1.2     ✓ dplyr   1.0.7
+## ✓ tidyr   1.1.4     ✓ stringr 1.4.0
+## ✓ readr   2.0.1     ✓ forcats 0.5.1</code></pre>
+<pre><code>## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(sf)</code></pre>
+<pre><code>## Linking to GEOS 3.8.1, GDAL 3.2.1, PROJ 7.2.1</code></pre>
+<pre class="r"><code>library(tmap)</code></pre>
+<pre><code>## Registered S3 methods overwritten by &#39;stars&#39;:
+##   method             from
+##   st_bbox.SpatRaster sf  
+##   st_crs.SpatRaster  sf</code></pre>
+<pre class="r"><code>mortgage &lt;-read_csv(here::here(&#39;dataset&#39;,&#39;dcr_clean.csv&#39;))</code></pre>
+<pre><code>## Rows: 619660 Columns: 32</code></pre>
+<pre><code>## ── Column specification ────────────────────────────────────────────────────────
+## Delimiter: &quot;,&quot;
+## chr  (3): state_orig_time, month, day
+## dbl (29): id, time, orig_time, first_time, mat_time, res_time, balance_time,...</code></pre>
+<pre><code>## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+<p>Firstly, we would like to have a quick look at the total number of mortgages in the US in each year.</p>
+<pre class="r"><code>mortgage %&gt;% group_by(year) %&gt;% summarise(n = n_distinct((id)))  %&gt;% ggplot(aes(x = year, y = n ))+geom_line() + geom_point() + labs(y = &#39;Total Mortgage&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q2-1.png" width="672" /></p>
+<pre class="r"><code>mortgage %&gt;%count(time, gdp_time) %&gt;% ggplot(aes(x = time, y = gdp_time)) + geom_point()+geom_line() + labs(y = &#39;GDP Growth&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q2-2.png" width="672" /></p>
+<p>As we can see that the mortgage market is rising in the US from 2000 to 2007. The market rises dramatically especially after 2004. However, during the 2008， number of mortgage sharply decreases. The number was cut by almost 200% by 2010 compared to 2007. We believe that the government might pose harsher regulation on mortgage after the economy crisis.</p>
+<p>We would also like to see the the number of mortgage across different regions in the US.</p>
+<pre class="r"><code>mortgage_last&lt;-mortgage %&gt;% group_by(id) %&gt;%  summarise_all(last) 
+epsg_us_equal_area &lt;- 2163
+us_states &lt;- st_read(here::here(&quot;dataset/cb_2019_us_state_20m/cb_2019_us_state_20m.shp&quot;))%&gt;% 
+  st_transform(epsg_us_equal_area)</code></pre>
+<pre><code>## Reading layer `cb_2019_us_state_20m&#39; from data source 
+##   `/Users/alex/Desktop/fa2021-final-project-digfora/dataset/cb_2019_us_state_20m/cb_2019_us_state_20m.shp&#39; 
+##   using driver `ESRI Shapefile&#39;
+## Simple feature collection with 52 features and 9 fields
+## Geometry type: MULTIPOLYGON
+## Dimension:     XY
+## Bounding box:  xmin: -179.1743 ymin: 17.91377 xmax: 179.7739 ymax: 71.35256
+## Geodetic CRS:  NAD83</code></pre>
+<pre class="r"><code>not_contiguous &lt;-
+  c(&quot;Guam&quot;, &quot;Commonwealth of the Northern Mariana Islands&quot;,
+    &quot;American Samoa&quot;, &quot;Puerto Rico&quot;, &quot;Alaska&quot;, &quot;Hawaii&quot;,
+    &quot;United States Virgin Islands&quot;)
+us_cont &lt;- us_states %&gt;%
+  filter(!NAME %in% not_contiguous) %&gt;% filter(NAME != &quot;District of Columbia&quot;) %&gt;%
+  transmute(STUSPS,STATEFP,NAME, geometry)
+q &lt;- mortgage_last %&gt;% group_by(state_orig_time) %&gt;% summarise(n = n()) 
+us_cont %&gt;% inner_join(q, by = c(&quot;STUSPS&quot; = &quot;state_orig_time&quot;)) %&gt;% tm_shape() + tm_polygons(col = &quot;n&quot;,palette = &quot;RdBu&quot;) </code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q3-1.png" width="672" /></p>
+<p>CA and FL leads to the number of mortgages in the US.</p>
+<p>As follows, we would like to have a closer look on the value distribution of the mortgage in the US.</p>
+<pre class="r"><code>mortgage %&gt;% count(id, balance_orig_time) %&gt;% ggplot() + geom_histogram(aes(balance_orig_time))+ xlim(0, 1500000) + labs(x = &#39;Mortgage Value&#39;,y = &#39;Total Number&#39;)</code></pre>
+<pre><code>## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
+<pre><code>## Warning: Removed 86 rows containing non-finite values (stat_bin).</code></pre>
+<pre><code>## Warning: Removed 2 rows containing missing values (geom_bar).</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q4-1.png" width="672" /></p>
+<p>We can see that the mortgage value in the US is right skewed distributed, with enormous amount in 100000 to 500000 dollars, and little amount bigger than 1000000. This is expected cause most can only afford cheaper houses.</p>
+<p>We would also like to have a look at the types of mortgage differed by payment time in the US.</p>
+<pre class="r"><code>mortgage %&gt;% mutate(duration = (mat_time - orig_time)/4) %&gt;% ggplot() + geom_histogram(aes(duration))</code></pre>
+<pre><code>## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q5-1.png" width="672" /></p>
+<p>We can see that enormous amount of the mortgages in US are 30 years, with little in 15 and 40 years.</p>
+<p>Since this is a panel dataset, multiple records may refer to the same mortgage, so we would also like to look at the number of newly issued mortgages each year.</p>
+<pre class="r"><code>mortgage_first&lt;-mortgage[match(unique(mortgage$id), mortgage$id),]
+mortgage_first_count&lt;-mortgage_first %&gt;% group_by(time) %&gt;% summarise(n = n_distinct((id)))
+time&lt;-data.frame(seq(1,60,1))
+colnames(time)&lt;-&#39;time&#39;
+mortgage_first_count&lt;-merge(mortgage_first_count,time,by=&#39;time&#39;, all = TRUE)
+mortgage_first_count$n&lt;-mortgage_first_count$n %&gt;% replace_na(0)
+
+ggplot(mortgage_first_count, aes(x = time)) +
+  geom_line(aes(y = n, color = &quot;first_morgage_number&quot;)) + labs(y = &#39;number of new mortgages&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q6-1.png" width="672" /></p>
+<p>The number of newly issued mortgage is rising dramatically from time period 15 to 35, and follows with a sharp drop.</p>
+<p>As followed, we would like to compare the growth rate of both GDP and new mortgage in 60 periods in one spot to see their relationships between mortgage and us economy. Here, to make both comparable, we times gdp growth by 1000.</p>
+<pre class="r"><code>mortgage %&gt;% count(time,gdp_time) %&gt;% left_join(mortgage_first_count, by = &#39;time&#39;) %&gt;% ggplot(aes(x = time)) + geom_line(aes(y = n.y, color = &quot;number_of_new_morgages&quot;)) +
+  geom_line(aes(y = gdp_time*1000, color = &quot;gdp_time&quot;)) + labs(y = &#39;Orange: NUmber of New Mortgages&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q7-1.png" width="672" /></p>
+<p>The rise and drop of both rates are strongly related. Before the economy crisis, the rise of US economy also comes with the increase of mortgage, since more and more people are confident that they can pay off some day. The excess amount of mortgage then leads to the economy crisis. We can see that number of newly issued mortagage decreases to nearly 0 with negative GDP growth.</p>
+<p>We would also like to look at the growth of mortgage and interest rate. To make both comparable, we times interest rate by 500.</p>
+<pre class="r"><code>interest &lt;- mortgage %&gt;%group_by(time) %&gt;%summarize(mean(interest_rate_time)) %&gt;% left_join(mortgage_first_count, by = &#39;time&#39;) 
+colnames(interest)[2]&lt;-&#39;interest_rate&#39;
+  ggplot(interest,aes(x = time)) + geom_line(aes(y = n,color = &quot;number_of_new_morgages&quot;)) + geom_line(aes(y = interest_rate*500, color = &quot;Interest Rate&quot;)) + labs(y = &#39;Orange: NUmber of New Mortgages&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q8-1.png" width="672" /></p>
+<p>This is also what we expected, before the economy crisis, the interest rate decreased dramatically from 0 to 20 period. More and more mortgage are issued because of low interest rate. As followed, the interet rate increases, more and more people then cannot pay off their debt, which leads to economy crisis and decrease of mortgage.</p>
+<p>After reviewing the whole data set, we then need to take a closer look at default rate, which is what we want to model.</p>
+<p>In the status time column, 0 stands for unfinished, 1 stands for pay_off, 2 stands for default. We would first like to see how many people are pay off，defualt or unfinish.</p>
+<pre class="r"><code>ggplot(mortgage_last)+geom_bar(aes(x = status_time)) + labs(x = &#39;0：Unfinished , 1: Default , 2: Payoff&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q9-1.png" width="672" /></p>
+<p>About 15000 household are default, 25000 are pay off, and 8000 are unfinished.</p>
+<p>We would like to see the how default rate changes with the time</p>
+<pre class="r"><code>f &lt;- mortgage %&gt;% filter(default_time == 0) %&gt;% count(time, default_time) 
+mortgage %&gt;% filter(default_time == 1) %&gt;% count(time, default_time) %&gt;% left_join(f, by = &#39;time&#39;) %&gt;% mutate(default_Rate = n.x/n.y) %&gt;% ggplot(aes(x = time, y = default_Rate)) + geom_line(color = &#39;Blue&#39;)</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q10-1.png" width="672" /></p>
+<p>As we expeceted, lots of household default in period 37, which corresbond to the economy crisis.</p>
+<p>We also hope to determine if credit score can affects one’s default rate:</p>
+<pre class="r"><code>ggplot(mortgage_last, aes(x = FICO_orig_time)) +                     
+    geom_histogram(data=subset(mortgage_last,status_time == 1),fill = &quot;red&quot;, alpha = 0.2) +
+    geom_histogram(data=subset(mortgage_last,status_time == 2),fill = &quot;blue&quot;, alpha = 0.2) +
+    geom_histogram(data=subset(mortgage_last,status_time == 0),fill = &quot;green&quot;, alpha = 0.2)</code></pre>
+<pre><code>## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q11-1.png" width="672" /></p>
+<p>Appratently, credit score is not the main indicator for defualts.Therefore, default rate might be more related to interest rate and GDP growth.</p>
+<p>Then we would like to compare the defaults across different regions in the US. We would first looks at the number of default across different states:</p>
+<pre class="r"><code>mortgage_1 &lt;- mortgage %&gt;% filter(status_time == 1) %&gt;% group_by(state_orig_time) %&gt;% summarize(count = n()) %&gt;% select(state_orig_time, count)
+US_mortgage &lt;- us_cont %&gt;% inner_join(mortgage_1, by = c(&quot;STUSPS&quot; = &quot;state_orig_time&quot;))
+tm_shape(US_mortgage) + tm_polygons(col = &quot;count&quot;,palette = &quot;RdBu&quot;) + tm_shape(US_mortgage) + tm_borders()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q12-1.png" width="672" /></p>
+<p>The number of defualt mortgage is CA and FL is very large, which can be our future focus.</p>
+<p>With CA and FL, We are unable to see the situation of other states. We then try to exclude these two states to see the number of defualts.</p>
+<pre class="r"><code>mortgage_2 &lt;- mortgage_1 %&gt;% filter(state_orig_time != &quot;CA&quot;) %&gt;% filter(state_orig_time != &quot;FL&quot;)
+US_mortgage_2 &lt;- us_cont %&gt;% inner_join(mortgage_2, by = c(&quot;STUSPS&quot; = &quot;state_orig_time&quot;))
+tm_shape(US_mortgage_2) + tm_polygons(col = &quot;count&quot;,palette = &quot;RdBu&quot;) + tm_shape(US_mortgage_2) + tm_borders()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q13-1.png" width="672" /></p>
+<p>We can see that number of defaults happens more frequently in east and west part of US, with more mortgage and more active economy.</p>
+<p>As followed, we would like to see the total value of defualt loan across different regions in the US.</p>
+<pre class="r"><code>mortgage_3 &lt;- mortgage %&gt;% filter(status_time == 1) %&gt;% group_by(state_orig_time) %&gt;% summarize(sum = sum(balance_time)) %&gt;% select(state_orig_time, sum)
+US_mortgage_3 &lt;- us_cont %&gt;% inner_join(mortgage_3, by = c(&quot;STUSPS&quot; = &quot;state_orig_time&quot;))
+tm_shape(US_mortgage_3) + tm_polygons(col = &quot;sum&quot;,palette = &quot;RdBu&quot;) + tm_shape(US_mortgage_3) + tm_borders()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q14-1.png" width="672" /></p>
+<p>CA and FL stills leads in this situation with dramatic amount of mortgages.</p>
+<p>We then try to exlcude the two states to see situation elsewhere.</p>
+<pre class="r"><code>mortgage_4 &lt;- mortgage_3 %&gt;% filter(state_orig_time != &quot;CA&quot;) %&gt;% filter(state_orig_time != &quot;FL&quot;)
+US_mortgage_4 &lt;- us_cont %&gt;% inner_join(mortgage_4, by = c(&quot;STUSPS&quot; = &quot;state_orig_time&quot;))
+tm_shape(US_mortgage_4) + tm_polygons(col = &quot;sum&quot;,palette = &quot;RdBu&quot;) + tm_shape(US_mortgage_4) + tm_borders()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/q15-1.png" width="672" /></p>
+<p>The east and west coast is still the places with largest value of default loan.</p>
+<p>After all these analysis, we believe that default of Mortgage are more related to US economy and interest rate, there indicators will be our future focus in building the model.</p>
+</div>

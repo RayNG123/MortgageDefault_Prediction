@@ -1,0 +1,35 @@
+---
+title: Why We Want To Do Data Analysis
+author: Ke Lan 
+date: '2021-10-22'
+slug: []
+categories: []
+tags: []
+description: In this week, we discuss principles and talk about how they are relevant and what adhering to the practice would entail for your data.
+toc: yes
+authors: []
+series: []
+lastmod: '2021-10-22T09:52:01-04:00'
+featuredVideo: ~
+featuredImage: ~
+---
+## Discuss how the principles for advancing equitable data practice are relevant to your data. I realize that many of the principles require interaction with communities but think about how the principles could be applied if possible. For two or three of principles, talk about how they are relevant and what adhering to the practice would entail for your data.
+
+ANS:
+Three principles are beneficence, respect for persons, and justice. 
+Beneficence is the commitment to maximize benefits and avoid causing harm to the extent possible, even if it is not a formal or legal requirement.	Beneficence centers the importance of considering risks and benefits holistically. Even large benefits do not always outweigh risks, particularly when risks are great and the people who bear the risks may not directly benefit.	
+		
+Between 2007 and 2008, the mortgage crisis severely hurt the economy of the whole world. As statisticians, we feel a strong responsibility to use our skills to forecast any economic downturn to eliminate potential risks at its early stage. We believe that if we can monitor relationships between multiple variables and an individual's default behavior, we can monitor changes in those variables to determine whether one is likely to default or payback. By determining that, we can decide whether the aggregated default rate is under control. 
+
+Respect for persons is the responsibility to uphold people’s power to make decisions that are in their best interest and to protect people who do not have that power. People can make informed decisions when they have information, the capability to understand it, and the freedom to act on it. When age, disability, or other circumstances, such as language or literacy, limit any of those three elements, people deserve special consideration and protection.
+
+Respect for persons: Our data is a randomized selection of mortgage-loan-level data collected from the portfolios underlying U.S. residential mortgage-backed securities (RMBS) securitization portfolios and provided by International Financial Research (www.internationalfinancialresearch.org). All of the personal data have been deidentified. What we are trying to achieve is to find a relationship between the credit risk in the mortgage market and the overall economic growth. By doing so, US citizens will be informed about more comprehensive information about the mortgage market and make better decisions. 
+
+
+## A particularly important principle is transparency. Talk about what might be some limitations of your analysis.
+
+Transparency plays a significant role in making the data analysis credible because people will be more likely to build trust with the analysis and be convinced by it. Being transparent about the data can help the process for people to make analytic decisions efficiently and respond proactively when errors enter an analysis.
+
+
+One of the limitations of our data is the time recorded in the dataset cannot be applied, which is due to errors that took place in the data collecting process (the timestamp observation is not recorded in a correct way). We acknowledge the lack of the time variable will cause the limitation, and we are working on it and trying to figure out what we can do with those timestamp variables. However, since the model would analyze attributes that influence the default behavior, any time variable without adding other effects like seasonality is not logical in the real world (suppose we draw a conclusion that people are more likely to default in november,  2019, it does not imply anything unless we further analyze any irregular traits that took place in this period, e.g., gdp/unemployment rate). Since we already have those other variables like gdp and unemployment rates, we believe lack of time variable does not significantly hurt the adequacy of the model. Many variables are included in the dataset except the time variable, so the dataset may result in an overfitting model. We would like to hear your opinions about the risk of overfitting and ways to avoid it.
+## Please see substitute-dataset-description for further update took place in 10/29

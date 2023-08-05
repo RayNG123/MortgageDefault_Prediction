@@ -1,0 +1,39 @@
+---
+title: Exploring Data
+author: Ke Lan
+date: '2021-10-15'
+slug: []
+categories: []
+tags: []
+description: Our primary exploration of different dataset and our ideas 
+toc: yes
+authors: []
+series: []
+lastmod: '2021-10-15T09:26:56-04:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+<script src="{{< blogdown/postref >}}index.en_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+
+</div>
+
+<div id="data-1-bluebike-data" class="section level2">
+<h2>Data 1 – Bluebike data</h2>
+<p><a href="https://s3.amazonaws.com/hubway-data/index.html" class="uri">https://s3.amazonaws.com/hubway-data/index.html</a>
+There are 432254 rows and 14 columns of data，including trip duration, start time, stop time, latitude, zip code, customer type and etc. Shared bikes are rising dramatically all over the world. During the pandemic, I visited some Chinese University and founds out that both students and staffs prefers to commute with shared bikes instead of uber, which makes me interested. I can see the same pattern in Boston, with more and more blue bikes appearing on the street. Therefore, I would like to make a deeper investigation into shared bikes in Boston. Then, I collected the data from Bluebike’public website. I can easily load the data since they are already in csv form. However, some clean are necessary. With this dataset, I hope to determine what makes shared bikes popular including location, customer type. However, I think more variables are needed to address the questions. I will try if I can get a license to get more in-depth data from Bluebike’s website.</p>
+</div>
+<div id="data2-amazon-data" class="section level2">
+<h2>Data2 – Amazon data</h2>
+<p><a href="https://www.kaggle.com/jacksoncrow/stock-market-dataset" class="uri">https://www.kaggle.com/jacksoncrow/stock-market-dataset</a>
+There are 52 datas in the package and each contains an individual stock price from 2004 - 2021 and each contains a open price/ high price/ low price/ last price/ close price. I can merge these stock’s close price to test the covariation (connectivity)
+I hope to determine a stock (except gold and BTC) that has a potential to hedge the risk, which is, it has low correlation with most of other stocks, which makes the stock capable to avoid any severe negative flucttuation from general stock index. Moreover, I hope to find homogenous stock changes, which means, I hope to find stocks always increase and decrease price at the same time. If I can find such prices, I can help investors to avoid putting those stocks in to the portfolio at the same time in order to diversify the portfolio</p>
+</div>
+<div id="data3-airbnb-data" class="section level2">
+<h2>Data3 – Airbnb data</h2>
+<p>It is gave by one of Ke Lan’s friend who worked in Airbnb as a data analyst intern.
+The data contains 36724 observations and 18 variables. I found the number of reviews, locations, availability, room type are useful variables at they might contribute to affect prices of individual airbnb. I hope I can build a regression to test the relationship of these variables with prices and I can build a simple machine learning to help decide the price of a room at specific date by intaking those variables. Moreover, it is possible to build a heat map to test price difference between different locations.</p>
+<p>##The airbnb data is submitted in github as a csv file</p>
+</div>

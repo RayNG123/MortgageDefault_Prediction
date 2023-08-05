@@ -1,0 +1,221 @@
+---
+title: Final Decision of Our Data
+author: Yusen Wu
+date: '2021-10-25'
+slug: []
+categories: []
+tags: []
+description: Our final decision of what data we want to explore
+toc: yes
+authors: []
+series: []
+lastmod: '2021-10-25T12:46:14-04:00'
+featuredVideo: ~
+featuredImage: ~
+---
+Mortgage Market analysis in the US
+
+## This dataset is from http://www.deepcreditrisk.com/data--code-private.html
+
+Description：
+
+The data set is in panel form and reports origination and performance observations for 50000 residential U.S. mortgage borrowers over 60 peiords. The periods have been deidentified. As in the real world, loans may originate before the start of the observation period. The loan observations may thus be censored as the loans mature or borrowers refinance. The data set is a randomized selection of mortgage-loan-level data collected from the portfolios underlying U.S. residential mortgage-backed securities (RMBS) securitization portfolios. Such randomization gives us a fair representation of US mortgage market development. We would like to combine the dataset with other market indicator to further measure the probability of default for personal investors.
+
+Key variables include:
+```{r q1}
+library(tidyverse)
+str<-'id: borrower id
+time: time stamp of observation
+orig_time: time stamp for origination
+first_time: time stamp for first observation
+mat_time: time stamp for maturity
+res_time: time stamp for resolution
+balance_time: outstanding balance at observation time
+LTV_time: loan to value ratio at observation time, in %
+interest_rate_time: interest rate at observation time, in %
+rate_time: risk-free rate
+hpi_time: house price index at observation time, base year=100
+gdp_time: GDP growth at observation time, in %
+uer_time: unemployment rate at observation time, in %
+REtype_CO_orig_time: real estate type condominium: 1, otherwise: 0
+REtype_PU_orig_time: real estate type planned urban developments: 1, otherwise: 0
+REtype_SF_orig_time: single family home: 1, otherwise: 0
+investor_orig_time: investor borrower: 1, otherwise: 0
+balance_orig_time: outstanding balance at origination time
+FICO_orig_time: FICO score at origination time, in %
+LTV_orig_time: loan to value ratio at origination time, in %
+Interest_Rate_orig_time: interest rate at origination time, in %
+state_orig_time: US state in which the property is located
+hpi_orig_time: house price index at observation time, base year=100
+default_time: default observation at observation time
+payoff_time: payoff observation at observation time
+status_time: default (1), payoff (2) and non-default/non-payoff (0) observation at observation time
+lgd_time: LGD assuming no discounting of cash flows
+recovery_res: sum of all cash flows received during resolution period'
+
+lista<-str_split(str, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+print(as.tibble(keydataname), n = 28)
+```
+
+## The blog posts together should address the following topics.
+## Data Loading and Cleaning
+```{r}
+library(tidyverse)
+mortgage <-read_csv("dcr_full.csv", col_types=cols(
+  id = col_double(),
+  time = col_double(),
+  orig_time = col_double(),
+  first_time = col_double(),
+  mat_time = col_double(),
+  res_time = col_double(),
+  balance_time = col_double(),
+  LTV_time = col_double(),
+  interest_rate_time = col_double(),
+  rate_time = col_double(),
+  hpi_time = col_double(),
+  gdp_time = col_double(),
+  uer_time = col_double(),
+  REtype_CO_orig_time = col_double(),
+  iREtype_PU_orig_time = col_double(),
+  REtype_SF_orig_time = col_double(),
+  investor_orig_time = col_double(),
+  balance_orig_time = col_double(),
+  FICO_orig_time = col_double(),
+  LTV_orig_time = col_double(),
+  Interest_Rate_orig_time = col_double(),
+  state_orig_time = col_character(),
+  hpi_orig_time = col_double(),
+  default_time = col_double(),
+  payoff_time = col_double(),
+  status_time = col_character()
+  ))
+mortgage
+problems()
+```
+# If you are working with a large data set, you might decide to start with a subset of the data. How did you choose this?
+
+I use a random number generator because I do not want my subset to be biased and stratified.
+
+## Discuss any initial steps you are taking to load and clean the data.
+
+Our Idea is to make a logistics regression to see any variable strongly influence people's choice between payoff and default, so the first step for us to clean the data is to only select those who already reach the deadline (eliminate those have not reached the maturity)
+while 2 represents payoff, 1 represents default, what we do is to select only the status_time = 1 or 2
+
+```{r}
+(mortgage <- mortgage %>% filter(status_time > 0))
+(mortgage %>% ggplot(aes(x = balance_time)) + geom_histogram())
+sqrt_result <- sqrt(var(mortgage$balance_time))
+mean_result <-mean(mortgage$balance_time)
+(threshold <- mean_result + 2 * sqrt_result)
+(mortgage <- mortgage %>% filter(balance_time < 422225.7))
+mortgage %>% ggplot(aes(x = balance_time)) + geom_histogram()
+mortgage %>% ggplot(aes(x = status_time, y = balance_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = LTV_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = interest_rate_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = Interest_Rate_orig_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = gdp_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = uer_time)) + geom_boxplot()
+```
+# If you are working with a large data set, you might decide to start with a subset of the data. How did you choose this?
+```{r}
+mortgage %>% mutate(count = n())%>% mutate(random = runif(count,1.0,10000.0)) %>% filter(random < 1000)
+```
+
+
+```{r q3}
+mortgage %>% ggplot(aes(id)) + geom_freqpoly()
+mortgage %>% count(time)
+mortgage %>% count(orig_time)
+mortgage %>% count(first_time)
+mortgage %>% count(mat_time)
+mortgage %>% count(res_time)
+mortgage %>% ggplot(aes(balance_time)) + geom_histogram()
+mortgage %>% filter(balance_time < 0)
+mortgage %>% count(LTV_time)
+mortgage %>% ggplot(aes(LTV_time)) + geom_histogram()
+mortgage %>% count(LTV_time, balance_time)
+mortgage %>% ggplot(aes(interest_rate_time)) + geom_histogram()
+mortgage %>% ggplot(aes(rate_time)) + geom_histogram()
+mortgage %>% ggplot(aes(hpi_time)) + geom_histogram()
+mortgage %>% ggplot(aes(hpi_orig_time)) + geom_histogram()
+mortgage %>% ggplot(aes(gdp_time)) + geom_histogram()
+mortgage %>% ggplot(aes(uer_time)) + geom_histogram()
+mortgage %>% count(REtype_CO_orig_time)
+mortgage %>% count(REtype_PU_orig_time)
+mortgage %>% count(REtype_SF_orig_time)
+mortgage %>% count(investor_orig_time)
+mortgage %>% ggplot(aes(balance_orig_time)) + geom_histogram()
+mortgage %>% filter(balance_time < 0)
+mortgage %>% ggplot(aes(FICO_orig_time)) + geom_histogram()
+mortgage %>% ggplot(aes(LTV_orig_time)) + geom_histogram()
+mortgage %>% ggplot(aes(Interest_Rate_orig_time)) + geom_histogram()
+mortgage %>% filter(Interest_Rate_orig_time < 0)
+mortgage %>% count(default_time)
+mortgage %>% count(payoff_time)
+mortgage %>% count(status_time)
+mortgage %>% count(state_orig_time)
+mortage1 <- mortgage %>% filter(!is.na(state_orig_time))
+```
+
+To clean the data, we use count function to check categorical value and geom_histogram to check numeral value. The Zero values in LTV and outstanding balance matches with each other(When the household pay off the debts). Since they are meaningful, we decide to leave them. Some of the variables like res_time has a lot of NA vlaues, but they are meaningful. We should keep them. However, there are 2829 NA values in state variable. Since they are meaningless, and the number is relatively small, we decided to filter them out. 
+
+One thing worths noticing is that the time of the dataset has been deidentified.It is difficult for us to combine ours with other datasets. Therefore, we decide to refill the exact time back. We do this by comparing the GDP growth data inside the dataset:
+
+```{r q4}
+mortage1 %>% count(gdp_time,time) %>% ggplot(aes(time,gdp_time)) + geom_line()
+```
+
+In US history, it is rare to see negative GDP growth. Therefore we check from the website and found out that the only peroid is US history with around -4.11% GDP growth, which is in the first quarter in 2009. After that, we compare other time and GDP growth, found out that the whole dataset is separated into 60 quaters from 2000 Q1 to 2014 Q4. Therefore, we can add the exact timeback to our dataset:
+
+```{r q5}
+date_seq<-seq(as.Date("2000/03/31"), by = "quarter", length.out = 60)
+date_dataframe<-data.frame(date_seq)
+date_dataframe<- date_dataframe%>%separate(date_seq,into=c('year','month','day'),sep='-')
+date_dataframe$quater=1
+date_dataframe$quater[date_dataframe$month=='07']<-2
+date_dataframe$quater[date_dataframe$month=='10']<-3
+date_dataframe$quater[date_dataframe$month=='12']<-4
+date_dataframe$time<-seq(1,60,1)
+mortgage2 <- mortage1 %>% left_join(date_dataframe, by = "time")
+mortgage2
+```
+
+After loading and cleaning, mortgage2 is the dataset we are working on.
+
+```{r q6}
+(mortgage3 <- mortgage2 %>% filter(status_time > 0))
+mortgage2 %>% ggplot(aes(x = balance_time)) + geom_histogram(binwidth = 10000)
+```
+
+These are patterns we found:
+```{r q7}
+sqrt_result <- sqrt(var(mortgage$balance_time))
+mean_result <-mean(mortgage$balance_time)
+(threshold <- mean_result + 2 * sqrt_result)
+(mortgage <- mortgage %>% filter(balance_time < 422225.7))
+mortgage %>% ggplot(aes(x = balance_time)) + geom_histogram()
+mortgage %>% ggplot(aes(x = status_time, y = balance_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = LTV_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = interest_rate_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = Interest_Rate_orig_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = gdp_time)) + geom_boxplot()
+mortgage %>% ggplot(aes(x = status_time, y = uer_time)) + geom_boxplot()
+```
+
+Our Idea is to make a logistics regression to see any variable strongly influence people's choice between payoff and default, so the first step for us to clean the data is to only select those who already reach the deadline (eliminate those have not reached the maturity)
+while 2 represents payoff, 1 represents default, what we do is to select only the status_time = 1 or 2
+
+No big difference between payoff and default groups of status in outstanding balance, loan-to-value and interest rate at observation time. For interest rate at original time, the upper quartile and mean between payoff and default groups have no large difference, but the lower quartile of  payoff group is apparently lower than the default group. The GDP at observation time for payoff group is apparently higher than default group. For the unemployment rate at observation time, both group have similar lower quartile, but default group has apparently higher mean and upper quartile than the payoff group.
+
+Since this is a large dataset, we can start by a subset.We can use a random number generator because I do not want my subset to be biased and stratified.
+```{r q8}
+mortgage %>% mutate(count = n())%>% mutate(random = runif(count,1.0,10000.0)) %>% filter(random < 1000)
+```
+
+
+
+
+

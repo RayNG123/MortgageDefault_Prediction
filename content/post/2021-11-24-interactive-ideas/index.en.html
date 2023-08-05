@@ -1,0 +1,177 @@
+---
+title: Interactive ideas
+author: Ke Lan
+date: '2021-11-24'
+slug: []
+categories: []
+tags: []
+description: In this week's blog post I will talk about my interactive ideas
+toc: yes
+authors: Ke Lan
+series: []
+lastmod: '2021-11-24T21:45:47-05:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+<script src="{{< blogdown/postref >}}index.en_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+
+</div>
+
+<div id="in-this-weeks-blog-post-i-will-talk-about-my-interactive-ideas" class="section level2">
+<h2>In this week’s blog post I will talk about my interactive ideas</h2>
+<p>We found our dataset online, and our dataset includes mortgage data: whether one pays off his mortgage or not and other characteristics of this specific mortgage, which enlightens us: whether there is characteristic(s) affect one’s inclination to payback the mortgage? Suppose, let’s say, when the economy is really really bad, one might not pay back the mortgage because he does not have the ability to do so! So, we want to propose an estimation application:</p>
+<p>Here is the code for our interactive ideas. Please note that it will be more contents once we finished our model selection!</p>
+<p>This interactive page will present a more straightfoward way for users to examine the distribution of default behavior among different segments: age groups, locations, FICO scores, year, and ltv ratio</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──</code></pre>
+<pre><code>## ✓ ggplot2 3.3.5     ✓ purrr   0.3.4
+## ✓ tibble  3.1.2     ✓ dplyr   1.0.7
+## ✓ tidyr   1.1.4     ✓ stringr 1.4.0
+## ✓ readr   2.0.1     ✓ forcats 0.5.1</code></pre>
+<pre><code>## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>library(sf)</code></pre>
+<pre><code>## Linking to GEOS 3.8.1, GDAL 3.2.1, PROJ 7.2.1</code></pre>
+<pre class="r"><code>library(tmap)</code></pre>
+<pre><code>## Registered S3 methods overwritten by &#39;stars&#39;:
+##   method             from
+##   st_bbox.SpatRaster sf  
+##   st_crs.SpatRaster  sf</code></pre>
+<pre class="r"><code>library(formattable)
+library(shiny)
+library(plotly)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;plotly&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:formattable&#39;:
+## 
+##     style</code></pre>
+<pre><code>## The following object is masked from &#39;package:ggplot2&#39;:
+## 
+##     last_plot</code></pre>
+<pre><code>## The following object is masked from &#39;package:stats&#39;:
+## 
+##     filter</code></pre>
+<pre><code>## The following object is masked from &#39;package:graphics&#39;:
+## 
+##     layout</code></pre>
+<pre class="r"><code>mortgage &lt;-read_csv(here::here(&#39;dataset&#39;,&#39;dcr_clean.csv&#39;))</code></pre>
+<pre><code>## Rows: 619660 Columns: 32</code></pre>
+<pre><code>## ── Column specification ────────────────────────────────────────────────────────
+## Delimiter: &quot;,&quot;
+## chr  (3): state_orig_time, month, day
+## dbl (29): id, time, orig_time, first_time, mat_time, res_time, balance_time,...</code></pre>
+<pre><code>## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+<pre class="r"><code>mortgage$age&lt;- mortgage$time-mortgage$orig_time
+mortgage$TTM&lt;-mortgage$mat_time-mortgage$orig_time
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep=&#39;-&#39;)
+mortgage_first&lt;-mortgage[match(unique(mortgage$id), mortgage$id),]
+mortgage_first$first_time_date&lt;-mortgage_first$date
+mortgage_first$first_time&lt;-mortgage_first$time
+first &lt;- mortgage_first %&gt;% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+
+
+get_last &lt;- mortgage %&gt;% select(id,date,time,default_time,payoff_time,status_time) %&gt;% group_by(id) %&gt;% summarise_all(last)
+get_last$last_time_date&lt;-get_last$date
+get_last$last_time&lt;-get_last$time
+get_last$status_last&lt;-get_last$status_time
+atlast &lt;- get_last %&gt;% select(id,last_time_date:status_last,default_time)
+meanvalue &lt;- mortgage %&gt;% group_by(id) %&gt;% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+mortgage_all &lt;- first %&gt;% left_join(atlast, by = &#39;id&#39;) %&gt;% left_join(meanvalue, by = &#39;id&#39;)
+year &lt;- mortgage %&gt;% pull(year) %&gt;% unique %&gt;% sort()
+x &lt;- variable.names(mortgage)
+y &lt;- variable.names(mortgage)
+state &lt;- mortgage %&gt;% pull(state_orig_time) %&gt;% unique() %&gt;% sort()
+ui &lt;- navbarPage(&quot;My Application&quot;,
+                 tabPanel(
+                     &quot;Component 1&quot;,
+                     sidebarLayout(
+                         sidebarPanel(
+                             checkboxGroupInput(inputId = &quot;state&quot;,
+                                                label = &quot;state&quot;,
+                                                choices = state)
+                             ),
+                         mainPanel( plotOutput(&quot;distPlot&quot;),verbatimTextOutput(&quot;summary&quot;) )
+                     )),
+                 tabPanel(&quot;Component 2&quot;,sidebarLayout(
+                     sidebarPanel(
+                        sliderInput(&quot;minage&quot;,&quot;minage&quot;,min = 0,max = 100,value = 0),
+                        sliderInput(&quot;maxage&quot;,&quot;maxage&quot;,min = 0,max = 100,value = 100),
+                        sliderInput(&quot;minfico&quot;,&quot;minfico&quot;,min = 400,max = 840,value = 400),
+                        sliderInput(&quot;maxfico&quot;,&quot;maxfico&quot;,min = 400,max = 840,value = 840),
+                        sliderInput(&quot;minltv&quot;,&quot;minltv&quot;,min = 50.1,max = 218.5,value = 50.1),
+                        sliderInput(&quot;maxltv&quot;,&quot;maxltv&quot;,min = 50.1,max = 218.5,value = 218.5),
+                        checkboxGroupInput(inputId = &quot;year&quot;,
+                                          label = &quot;year&quot;,
+                                          choices = year)
+                        ), 
+                     mainPanel( checkboxGroupInput(inputId = &quot;status&quot;,
+                                            label = &quot;status&quot;,
+                                            choices = c(&quot;dafault&quot;,&quot;payback&quot;,&quot;haven&#39;t reach maturity&quot;),
+                                            selected = c(&quot;dafault&quot;,&quot;payback&quot;,&quot;haven&#39;t reach maturity&quot;)),
+                       plotOutput(&quot;plot2&quot;))
+                         )),
+                 tabPanel(&quot;Component 3&quot;)
+)
+
+server &lt;- function(input, output) {
+    output$distPlot &lt;- renderPlot({
+        new &lt;- mortgage %&gt;% filter(state_orig_time %in% input$state) 
+        new &lt;- new %&gt;% group_by(status_time) %&gt;% summarize(count = n())%&gt;% filter(status_time != 0)%&gt;% mutate(status = ifelse(status_time == 1, &quot;dafault&quot;, &quot;payback&quot;))
+        ggplot(aes(x = status, y = count),data = new) + geom_bar(stat=&#39;identity&#39;)
+    })
+   output$summary &lt;- renderPrint({
+       hi &lt;- mortgage %&gt;% filter(state_orig_time %in% input$state) %&gt;% group_by(status_time) %&gt;% summarize(count = n())%&gt;% filter(status_time != 0)%&gt;% mutate(status = ifelse(status_time == 1, &quot;dafault&quot;, &quot;payback&quot;))
+       
+       new_default &lt;- hi %&gt;% filter(status_time == 1) %&gt;% pull(count)
+       new_payback &lt;- hi %&gt;% filter(status_time == 2) %&gt;% pull(count)
+       print(paste0(&quot;As shown in the graph, the total number of default is: &quot;, new_default, &quot;  the total number of default is: &quot;,
+                                               new_payback))
+    
+ })
+
+
+   
+   output$plot2 &lt;- renderPlot({ 
+      location &lt;-read_csv(here::here(&#39;dataset&#39;,&#39;world_country_and_usa_states_latitude_and_longitude_values.csv&#39;))
+      p &lt;-left_join(mortgage, location, by = c(&quot;state_orig_time&quot;=&quot;usa_state_code&quot;))
+      p &lt;- p %&gt;% filter(age &lt; input$maxage&amp;age &gt; input$minage) %&gt;% filter(FICO_orig_time&lt; input$maxfico&amp;FICO_orig_time &gt; input$minfico)%&gt;%
+         filter(year %in% input$year) %&gt;%
+         filter(LTV_orig_time&lt; input$maxltv&amp;LTV_orig_time &gt; input$minltv)  %&gt;% 
+        mutate(status = ifelse(status_time == 1,&quot;default&quot;, (ifelse(status_time == 2, &quot;payback&quot;,&quot;haven&#39;t reach maturity&quot; )))) %&gt;%
+        filter(status %in% input$status) %&gt;%
+         group_by(state_orig_time) %&gt;% summarize(usa_state_longitude = mean(usa_state_longitude),
+                                                  usa_state_latitude = mean(usa_state_latitude),count = n())
+      
+      epsg_us_equal_area &lt;- 2163
+      
+      us_states &lt;- st_read(here::here(&quot;dataset/cb_2019_us_state_20m/cb_2019_us_state_20m.shp&quot;))%&gt;% 
+        st_transform(epsg_us_equal_area)
+      not_contiguous &lt;-
+        c(&quot;Guam&quot;, &quot;Commonwealth of the Northern Mariana Islands&quot;,
+          &quot;American Samoa&quot;, &quot;Puerto Rico&quot;, &quot;Alaska&quot;, &quot;Hawaii&quot;,
+          &quot;United States Virgin Islands&quot;)
+      
+      us_cont &lt;- us_states %&gt;%
+        filter(!NAME %in% not_contiguous) %&gt;% filter(NAME != &quot;District of Columbia&quot;) %&gt;%
+        transmute(STUSPS,STATEFP,NAME, geometry)
+      p &lt;- us_cont %&gt;% inner_join(p, by = c(&quot;STUSPS&quot; = &quot;state_orig_time&quot;))
+      ggplot() + 
+        geom_sf(data=p,size=0.1) +
+        geom_sf(data=p,lwd=2,aes(fill=count)) +scale_fill_viridis_b()
+      
+      
+      
+       
+       
+   })
+}
+    
+shinyApp(ui = ui, server = server)</code></pre>
+<p><div style="width: 100% ; height: 400px ; text-align: center; box-sizing: border-box; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" class="muted well">Shiny applications not supported in static R Markdown documents</div></p>
+</div>

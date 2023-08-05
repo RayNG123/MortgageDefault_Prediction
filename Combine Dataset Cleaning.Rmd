@@ -1,0 +1,79 @@
+---
+title: "Combine Dataset Cleaning"
+author: "Yusen Wu"
+date: "12/3/2021"
+output: html_document
+---
+
+Combine dataset: S&P Index:
+```{r }
+
+SP <- read_csv(here::here('dataset/Combine Dataset/S&P .csv'))
+SP <- SP %>% mutate(MeanSP = (High + Low)/2) %>% select(Date,Volume,MeanSP) 
+SP$Date <- as.character(SP$Date)
+SP <- SP %>% filter(MeanSP != 1414.070)
+SP <- SP %>% separate(Date,into=c('year','month','day'),sep='-') %>% arrange(year,month)
+SP$time<- rep(1:60,each = 3)
+SP <- SP %>% group_by(time) %>% summarise(mean_sp = mean(MeanSP),mean_volume = mean(Volume)) 
+
+```
+
+Combine dataset: Dow Jones Real Estate Index:
+```{r}
+Index <- read_csv(here::here('dataset/Combine Dataset/DJ Real Estate Data.csv')) 
+Index <- Index %>% separate(Date,into=c('year','month','day'),sep='/') %>% filter(year != 2015 & Price != 172.76) 
+Index$time <- rep(50:1,each = 3)
+Index <- Index %>% arrange(time)
+Index$time <- rep(1:50,each = 3)
+Index$time <- Index$time + 10
+Index <- Index %>% group_by(time) %>% summarise(mean_index = mean(Price))
+```
+
+Combine dataset-US housing market: 
+New Construction, House Sales, House Supply, House Inventory
+```{r }
+#Combine dataset: House Start
+Start <- read_csv(here::here('dataset/Combine Dataset/House start.csv')) %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Start)[4] = c('house_start')
+Start <- Start %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Start$time <- rep(1:60,each = 3)
+Start <- Start %>% group_by(time) %>% summarise(house_start = mean(house_start))
+
+#Combine dataset: New House Sales:
+Sales <- read_csv(here::here('dataset/Combine Dataset/Sales.csv'))  %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Sales)[4] = c('Sales')
+Sales <- Sales %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Sales$time <- rep(1:60,each = 3)
+Sales <- Sales %>% group_by(time) %>% summarise(Mean_sale = mean(Sales))
+
+#Combine dataset: House Supply:
+Supply <- read_csv(here::here('dataset/Combine Dataset/Supply.csv')) %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Supply)[4] = c('Supply')
+Supply <- Supply %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Supply$time <- rep(1:60,each = 3)
+Supply <- Supply %>% group_by(time) %>% summarise(Mean_supply = mean(Supply))
+
+#Combine dataset: House Inventory:
+Inventory <- read_csv(here::here('dataset/Combine Dataset/House Inventory.csv')) %>% separate(Period,into=c('year','month','day'),sep='-') 
+names(Inventory)[4] = c('Inventory')
+Inventory <- Inventory %>% filter(year > 1999 & year < 2015) %>% arrange(year,month)
+Inventory$time <- rep(1:60,each = 3)
+Inventory <- Inventory %>% group_by(time) %>% summarise(Mean_invenotry = mean(Inventory))
+
+#Combine All Combine dataset
+Housing_Market <- Start %>% left_join(Sales, by = 'time') %>% left_join(Supply, by = 'time') %>% left_join(Inventory, by = 'time')
+names(Housing_Market) = c('time','Start','Sale','Supply','Inventory')
+Housing_Market
+```
+
+Combine dataset：RMBS Insurance：
+```{r }
+Insurance <- read_csv(here::here('dataset/Combine Dataset/RMBS insurance.csv'))  
+names(Insurance)[1] = c('time')
+names(Insurance)[6] = c('agency_mortgage_related_securities')
+names(Insurance)[7] = c('non_agency_mortgage_related securities')
+RMBS_Issue <- Insurance %>% filter(time > 1999 & time < 2015)
+RMBS_Issue
+```
+
+

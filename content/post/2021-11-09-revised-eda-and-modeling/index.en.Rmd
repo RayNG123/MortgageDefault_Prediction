@@ -1,0 +1,393 @@
+---
+title: Revised EDA and Modeling
+author: Ke Lan
+date: '2021-11-09'
+slug: []
+categories: []
+tags: []
+description: starting a construct a model to predict default rate of certain mortgage
+toc: yes
+authors: []
+series: []
+lastmod: '2021-11-09T11:56:01-05:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+The map in last blog post is a little hard to make too much sense of since it largely just reflects population, so we revised it.
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(formattable)
+mortgage <-read_csv(here::here('dataset','dcr_clean.csv'))
+mortgage_last<-mortgage %>% group_by(id) %>%  summarise_all(last) 
+epsg_us_equal_area <- 2163
+us_states <- st_read(here::here("dataset/cb_2019_us_state_20m/cb_2019_us_state_20m.shp"))%>% 
+  st_transform(epsg_us_equal_area)
+not_contiguous <-
+  c("Guam", "Commonwealth of the Northern Mariana Islands",
+    "American Samoa", "Puerto Rico", "Alaska", "Hawaii",
+    "United States Virgin Islands")
+
+us_cont <- us_states %>%
+  filter(!NAME %in% not_contiguous) %>% filter(NAME != "District of Columbia") %>%
+  transmute(STUSPS,STATEFP,NAME, geometry)
+p <- mortgage %>% group_by(state_orig_time) %>% summarize(count = n(),def = sum(status_time[status_time == 1])) %>% mutate(proportion = formattable::percent(def / count))
+us_cont %>% inner_join(p, by = c("STUSPS" = "state_orig_time")) %>% tm_shape() + tm_polygons(col = "proportion",palette = "RdBu") + tm_text("STUSPS", size = 1/2) + tm_layout(title= 'percentage of number of default')
+q <- mortgage %>% group_by(state_orig_time) %>% summarize(total = sum(balance_orig_time),def = sum(balance_orig_time[status_time == 1])) %>% mutate(proportion = formattable::percent(def / total))
+us_cont %>% inner_join(q, by = c("STUSPS" = "state_orig_time")) %>% tm_shape() + tm_polygons(col = "proportion",palette = "RdBu") +  tm_text("STUSPS", size = 1/2) +  tm_layout(title= 'percentage of default amount')
+```
+
+
+
+
+For this week, we are starting a construct a model to predict default rate of certain mortgage. Since we have a panel dataset--multiple records refer to a same mortgage over different period. We would not know whether a mortgage is default or payoff until we see last record of this mortgage.  Therefore, it is a little bit complicated for us to build a logistic linear regression. We then decided to normalized the dataset again and try to collapse them to build a dataset with have only one record for one mortgage, including their start time, end time, their age,avergae GDP during the mortgage, status at last(default or pay off) and etc.
+
+Firstly, we would like to determine the start time, age, time to maturity of 
+We start by loading the dataset and packages:
+```{r q1}
+library(tidyverse)
+mortgage <- read_csv(here::here('dataset','dcr_clean.csv'))
+#create a new column for the age of a mortgage
+mortgage$age<- mortgage$time-mortgage$orig_time
+#create a new column for the time to maturity of a mortgage
+mortgage$TTM<-mortgage$mat_time-mortgage$orig_time
+#create a continuous time variable for each records
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep='-')
+#found out the first-time record for all mortgages
+mortgage_first<-mortgage[match(unique(mortgage$id), mortgage$id),]
+#create a column for start time of each mortgage
+mortgage_first$first_time_date<-mortgage_first$date
+mortgage_first$first_time<-mortgage_first$time
+#leave only the collumn that contains first time data of the mortgage
+first <- mortgage_first %>% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+```
+
+
+As followed, we would like to determine the ending status of each mortgage(defualt, pay off or unfnished):
+
+```{r q2}
+#Get the last record for all mortgages in the dataset
+get_last <- mortgage %>% select(id,date,time,default_time,payoff_time,status_time) %>% group_by(id) %>% summarise_all(last)
+#determine the end time of a mortgage
+get_last$last_time_date<-get_last$date
+get_last$last_time<-get_last$time
+#determine the status of the mortgage
+get_last$status_last<-get_last$status_time
+atlast <- get_last %>% select(id,last_time_date:status_last,default_time)
+```
+
+As followed, we would like to get the mean value of GDP growth, Unemployment Rate, Risk_free rate, interest rate, house price index for each mortgage from their start to their end.
+
+```{r q3}
+meanvalue <- mortgage %>% group_by(id) %>% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+```
+
+Now We would like to join the three dataset together to form the new dataset with one record for one mortgage:
+
+```{r q4}
+mortgage_all <- first %>% left_join(atlast, by = 'id') %>% left_join(meanvalue, by = 'id')
+```
+
+We would like to add one more variable, time between the start of the mortgage and global financial crisis(time 37) to measure the influence of Financial Crisis to the mortgage
+
+```{r q5}
+mortgage_all$time_to_GFC <- 37-mortgage_all$first_time
+```
+
+Here is the column expalnation of our new datasets.
+```{r q6}
+newstr<-'id:borrower id
+first_time:time stamp for first observation
+orig_time:time stamp for origination
+mat_time:time stamp for maturity
+rate_time:risk-free rate
+REtype_CO_orig_time:real estate type condominium: 1, otherwise: 0
+REtype_PU_orig_time:real estate type planned urban developments: 1, otherwise: 0
+REtype_SF_orig_time:single family home: 1, otherwise: 0
+investor_orig_time:investor borrower: 1, otherwise: 0
+balance_orig_time:outstanding balance at origination time
+FICO_orig_time:FICO score at origination time, in %
+LTV_orig_time:loan to value ratio at origination time, in %
+Interest_Rate_orig_time:interest rate at origination time, in %
+state_orig_time:US state in which the property is located
+hpi_orig_time:house price index at observation time, base year=100
+first_time_date:date of the first observation
+age:number of periods from origination to time of observation
+TTM:time to maturity at the time of observation
+last_time_date:date of the last observation
+last_time:time stamp for the last observation
+status_last:debt status at the last observation: 0 is unfinished, 1 is default, 2 is paidoff
+interest_rate_mean:the average interest rate of all observation periods
+gdp_mean:the average GDP growth of all observation periods
+risk_free_mean:the average risk free rate of all observation periods
+hpi_mean:the average house price index of all observation periods
+uer_mean:the average unemployment rate of all observation periods
+time_to_GFC:number of periods from first observation to global financial crisis'
+
+lista<-str_split(newstr, "\n")
+keydataname<-data.frame(lista)
+colnames(keydataname)<-'dataname'
+keydataname<-keydataname %>% separate(dataname,into=c('Column Name','Description'),sep=':')
+as.tibble(keydataname) %>%knitr::kable()
+```
+
+Now, we will need to filter out mortgages that are unfinished.
+
+```{r q7}
+mortgage_all <- mortgage_all %>% filter(status_last != 0)
+```
+
+Some of the columns that are not included will be discussed in the future.Now, with the new collapsed dataset, we can start constructing our model. Firstly, we would like to construct a correlation table to determine which varible to be included in our regression fuction.
+
+```{r q8}
+variable_subset <- mortgage_all[c('first_time','orig_time','mat_time','rate_time','REtype_CO_orig_time','REtype_PU_orig_time','REtype_SF_orig_time','investor_orig_time','balance_orig_time','FICO_orig_time','LTV_orig_time','Interest_Rate_orig_time','hpi_orig_time','age','TTM','last_time','default_time','interest_rate_mean','gdp_mean','risk_free_mean','hpi_mean','uer_mean','time_to_GFC')]
+
+cor(variable_subset) %>% knitr::kable()
+```
+
+Now I will make run a regression between default_rate and each variable and plot them with ggplot. For values like GDP,House Price Index, Unemployment Rate with both mean and first-time value, I will only focus on the one with stronger correlation to default rate.I will start by the one with the strongest to the weakest.
+
+```{r q9}
+cor(variable_subset,variable_subset$default_time) 
+```
+
+mean GDP:
+```{r q10}
+library(modelr)
+mor_mod <- glm(default_time ~ gdp_mean, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(gdp_mean) %>%
+ add_predictions(mor_mod, type = "response"))
+
+ggplot(mortgage_all, aes(gdp_mean)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+pattern:
+As gdp mean increases roughly from 3.75 to 5.0, the default rate shows a decrease pattern from 1 to 0. The dots are mainly gathered from 0 to 2.5 gdp mean for both default and pay-off.
+
+Original House Price Index:
+```{r q11}
+mor_mod1 <- glm(default_time ~ hpi_orig_time, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod1))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(hpi_orig_time) %>%
+ add_predictions(mor_mod1, type = "response"))
+
+ggplot(mortgage_all, aes(hpi_orig_time)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+pattern:
+There is a weak correlation between the original house price index (base year = 100) and default rate. As the original house price index increases from 75 to 200, the default rate increases at the same time from 0 to 0.5. 
+
+For time varible, I will keep only origin time of the dataset:
+```{r q12}
+mor_mod2 <- glm(default_time ~ orig_time, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod2))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(orig_time) %>%
+ add_predictions(mor_mod2, type = "response"))
+
+ggplot(mortgage_all, aes(orig_time)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+pattern:
+As we can see, the default rate tends to be 0 when time stamp for start of the mortgage from -40 to 0. The default rate increases dramatically from 0 to 40, and remains at 1 from 40 to 60.
+
+First time Risk-free rate:
+```{r q13}
+mor_mod4 <- glm(default_time ~ rate_time, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod4))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(rate_time) %>%
+ add_predictions(mor_mod4, type = "response"))
+
+ggplot(mortgage_all, aes(rate_time)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+Pattern:
+There is a strong correlation between these two variables. As first time risk-free rate increases, the default rate increases dramatically from 0 to 1.
+
+Unemployment Rate:
+```{r q14}
+mor_mod5 <- glm(default_time ~ uer_mean, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod5))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(uer_mean) %>%
+ add_predictions(mor_mod5, type = "response"))
+
+ggplot(mortgage_all, aes(uer_mean)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+Pattern:
+There is a positive linear relationship between the average unemployment rate and default rate. As the average unemployment rate increases from roughly 4 to 10, the default rate increases from 0.25 to 0.75.
+
+Mean Interest Rate:
+```{r q15}
+mor_mod6 <- glm(default_time ~ interest_rate_mean, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod6))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(interest_rate_mean) %>%
+ add_predictions(mor_mod6, type = "response"))
+
+ggplot(mortgage_all, aes(interest_rate_mean)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+Pattern:
+The default rate increases dramatically as the average interest rate of all observation periods from roughly 2 to 20, and default rate tends to be flat from 20 to roughly 37.
+
+Time to Maturity:
+```{r q16}
+mor_mod7 <- glm(default_time ~ TTM, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod7))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(TTM) %>%
+ add_predictions(mor_mod7, type = "response"))
+
+ggplot(mortgage_all, aes(TTM)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+Pattern:
+There is a positive non-linear relationship between scheduled time to maturity and default rate. The slope increases slowly at the beginning, and start to increase relative deeply at roughly 100. 
+
+FICO score(credit score):
+```{r q17}
+mor_mod8 <- glm(default_time ~ FICO_orig_time, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod8))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(FICO_orig_time) %>%
+ add_predictions(mor_mod8, type = "response"))
+
+ggplot(mortgage_all, aes(FICO_orig_time)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+pattern:
+The correlation between default rate and FICO score(credit score) at origination time is negative and weak, which indicates a small correlation between these two variables.
+
+Loan to Value ratio:
+```{r q18}
+mor_mod9 <- glm(default_time ~ LTV_orig_time, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod9))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(LTV_orig_time) %>%
+ add_predictions(mor_mod9, type = "response"))
+
+ggplot(mortgage_all, aes(LTV_orig_time)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+
+
+```
+
+Pattern:
+The correlation here looks pretty steady, except a little twit around LTV_orig_time = 175. This indicates an overall stable positive linear correlation between default time and loan-to-value ratio.
+
+age of a mortgage:
+```{r q19}
+mor_mod10 <- glm(default_time ~ age, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod10))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(age) %>%
+ add_predictions(mor_mod10, type = "response"))
+
+ggplot(mortgage_all, aes(age)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+pattern:
+The correlation here looks negatively linear but not strong, since the correlation line is relatively flat, which indicates a small tangent and small correlation between these two variables.
+
+Investor Type:
+```{r q20}
+ggplot(data=mortgage_all, mapping=aes(x= investor_orig_time,y=REtype_SF_orig_time))+
+  geom_bar(stat="identity")
+
+```
+
+Pattern:
+
+Value of the house:
+```{r q21}
+mor_mod12 <- glm(default_time ~ balance_orig_time, data = mortgage_all, family = binomial)
+(beta <- coef(mor_mod12))
+
+library(modelr)
+(grid <- mortgage_all %>% data_grid(balance_orig_time) %>%
+ add_predictions(mor_mod12, type = "response"))
+
+ggplot(mortgage_all, aes(balance_orig_time)) + geom_point(aes(y = default_time),alpha = 0.005) +
+ geom_line(aes(y = pred), data = grid, color = "red", size = 1)
+```
+
+Pattern:
+There is almost no correlation between value of the house and default rate. The correlation line is totally flat, which means value of the house does not affect default time.
+
+REtype_CO_orig_tim:condominium:
+```{r q22}
+ggplot(data=mortgage_all, mapping=aes(x=default_time,y=REtype_CO_orig_time))+
+  geom_bar(stat="identity")
+```
+ 
+Pattern:
+The ratio of pay-off to default in condominium is around 1:2, with pay-off approximately 1000 and default approximately 2000. This type of real estate has the largest difference in ratio between payoff and default.
+
+REtype_PU_orig_time	real estate type planned urban developments:
+```{r q23}
+ggplot(data=mortgage_all, mapping=aes(x=default_time,y=REtype_PU_orig_time))+
+  geom_bar(stat="identity")
+```
+
+Pattern:
+The ratio of pay-off to default in planned urban developments is around 3:5, with pay-off approximately 1800 and default approximately 3000.
+
+REtype_SF_orig_time	single family home:
+```{r q24}
+ggplot(data=mortgage_all, mapping=aes(x=default_time,y=REtype_SF_orig_time))+
+  geom_bar(stat="identity")
+```
+
+Pattern:
+The ratio of pay-off to default in single family home is around 19:33, with pay-off approximately 9500 and default approximately 16500. This type of real estate has the most counts.
+So, after ploting all these varible, we are now able to complete our full regression model:
+```{r q25}
+library(modelr)
+glm(default_time ~ age + first_time+REtype_CO_orig_time+REtype_PU_orig_time+REtype_SF_orig_time+
+interest_rate_mean+gdp_mean+rate_time+hpi_orig_time+uer_mean+investor_orig_time+balance_orig_time+FICO_orig_time+LTV_orig_time+TTM- 1 , data = mortgage_all, family = binomial) %>% broom::tidy()
+```
+
+As we can see from the chart, condominium or not, planned urban developments or not, the value of the house, is not statistically significant. Therefore, we will kick them out od our model.
+
+```{r q26}
+library(modelr)
+glm(default_time ~ age + first_time+REtype_SF_orig_time+interest_rate_mean+gdp_mean+rate_time+hpi_orig_time+uer_mean+investor_orig_time+FICO_orig_time+LTV_orig_time+TTM- 1 , data = mortgage_all, family = binomial) %>% broom::tidy()
+```
+
+Generally speaking, GDP growth, uemployment rate,and the mean interest rate is still the outside dominant factor that may influence one's default rate. In addition to that, investor house or not， loan to house value ratio, time to maturity are also the inside factor that determines one's default rate.Therefore, whether one will default or not in a mortgage is strongly related to both the economy of the country and the types of specific mortgage.
+
+
+
+
+
+
+
+

@@ -1,0 +1,67 @@
+---
+title: Exploring Data with insights
+author: Ke Lan
+date: '2021-10-20'
+slug: []
+categories: []
+tags: []
+description: Our primary methods of cleaning data
+toc: yes
+authors: []
+series: []
+lastmod: '2021-10-20T23:58:26-04:00'
+featuredVideo: ~
+featuredImage: ~
+---
+The blog posts together should address the following topics.
+Data Loading and Cleaning
+Discuss any initial steps you are taking to load and clean the data.
+```{r}
+library(tidyverse)
+salary <-read_csv("Levels_Fyi_Salary_Data.csv", col_types=cols(
+  company = col_character(),
+  level = col_character(),
+  title = col_character(),
+  totalyearlycompensation = col_double(),
+  yearsatcompany = col_double(),
+  yearsofexperience = col_double(),
+  gender = col_character(),
+  Race = col_character(),
+  Education = col_character()))
+salary
+```
+
+## our methods of loading data is described above, and variable Gender/ Race/ Education contains a lot of missing values (NAs) and we want to plot the observation of these three variable first to see whether missing values' salary has large skew or randomly distributed. If it is randomly distributed, we will drop those missing values and if it is largely skewed we might keep them.
+
+# If you are working with a large data set, you might decide to start with a subset of the data. How did you choose this?
+
+```{r}
+salary %>% mutate(random = runif(62642,1.0,10000.0)) %>% filter(random < 30)
+```
+
+## I use a random number generator because I do not want my subset to be biased and stratified.
+
+Are you starting by removing missing values or focusing on columns with less missing data? 
+
+## our methods of loading data is described above, and variable Gender/ Race/ Education contains a lot of missing values (NAs) and we want to plot the observation of these three variable first to see whether missing values' salary has large skew or randomly distributed. If it is randomly distributed, we will drop those missing values and if it is largely skewed we might keep them.
+
+## Moreover we will drop any company with less than 30 observations. and extreme value of salary
+
+```{r}
+salary %>% group_by(company) %>% summarize(count = n()) %>% filter(count < 30) 
+salary <-salary %>% arrange (desc(totalyearlycompensation)) %>% filter(totalyearlycompensation < 3000000) %>% filter(!company %in% c("10x Genomics", "23andMe", "2U","3m","3M","7-eleven", "7-Eleven","8x8","ABB","abbott"))
+salary
+```
+
+Exploratory Data Analysis
+Talk about your initial exploration of the data. Give summary statistics and make plots about parts of the data that will be your focus.
+
+```{r}
+salary %>% arrange(desc(totalyearlycompensation)) %>% filter(totalyearlycompensation < 3000000)
+salary %>% arrange(desc(totalyearlycompensation)) %>% filter(totalyearlycompensation < 3000000)%>% ggplot(aes(x = gender, y = totalyearlycompensation)) + geom_boxplot()
+salary%>% arrange(desc(totalyearlycompensation)) %>% filter(totalyearlycompensation < 3000000) %>% ggplot(aes(x = Race, y = totalyearlycompensation)) + geom_boxplot()
+salary %>% arrange(desc(totalyearlycompensation)) %>% filter(totalyearlycompensation < 3000000)%>% ggplot(aes(x = Education, y = totalyearlycompensation)) + geom_boxplot()
+salary %>% arrange(desc(totalyearlycompensation)) %>% filter(totalyearlycompensation < 3000000)%>% ggplot(aes(x = yearsofexperience, y = yearsatcompany)) + geom_smooth()
+```
+What are the big, obvious patterns in the data? Are these surprising?
+## no big difference between NA and other categories in these three variables, and we observed a strong correlation between years of experience and years at company, the correlation need to be addressed...,,,,,

@@ -1,0 +1,145 @@
+---
+title: Machine Learning
+author: Ke Lan
+date: '2021-11-17'
+slug: []
+categories: []
+tags: []
+description: Using more sophisticated methods to build model to try to see whether it ca n increase the general accuracy
+toc: yes
+authors: []
+series: []
+lastmod: '2021-11-17T17:02:36-05:00'
+featuredVideo: ~
+featuredImage: ~
+---
+This week we use more about model selection and we will add more variables from other datasets to our model
+```{r}
+library(tidyverse)
+library(sf)
+library(Matrix)
+library(tmap)
+library(formattable)
+library(caret)
+mortgage <-read_csv(here::here('dataset','dcr_clean.csv'))
+mortgage$age<- mortgage$time-mortgage$orig_time
+mortgage$TTM<-mortgage$mat_time-mortgage$orig_time
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep='-')
+mortgage_first<-mortgage[match(unique(mortgage$id), mortgage$id),]
+mortgage_first$first_time_date<-mortgage_first$date
+mortgage_first$first_time<-mortgage_first$time
+first <- mortgage_first %>% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+
+get_last <- mortgage %>% select(id,date,time,default_time,payoff_time,status_time) %>% group_by(id) %>% summarise_all(last)
+get_last$last_time_date<-get_last$date
+get_last$last_time<-get_last$time
+get_last$status_last<-get_last$status_time
+atlast <- get_last %>% select(id,last_time_date:status_last,default_time)
+meanvalue <- mortgage %>% group_by(id) %>% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+mortgage_all <- first %>% left_join(atlast, by = 'id') %>% left_join(meanvalue, by = 'id')
+mortgage_all$time_to_GFC <- 37-mortgage_all$first_time
+```
+
+```{r}
+## to increase the accuracy, I use Lasso regression with machine learning
+mortgage_ml <- na.omit(mortgage_all)
+set.seed(123)
+training.samples <- mortgage_ml$default_time %>% 
+  createDataPartition(p = 0.8, list = FALSE)
+train.data  <- mortgage_ml[training.samples, ]
+test.data <- mortgage_ml[-training.samples, ]
+```
+
+```{r}
+library(glmnet)  
+library(faraway)
+x <- model.matrix(default_time ~ age + TTM+ last_time+ status_last+ interest_rate_mean+gdp_mean*uer_mean+ risk_free_mean+ hpi_mean+  FICO_orig_time+ hpi_mean,
+                         data = train.data)[,-1]
+
+y <- ifelse(train.data$default_time == 1, 1, 0)
+glmnet(x, y, family = "binomial", alpha = 1, lambda = NULL)
+
+set.seed(123) 
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+model <- glmnet(x, y, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+
+
+
+coef(model)
+
+```
+
+```{r}
+x.test <- model.matrix(default_time ~ age + TTM+ last_time+ status_last+ interest_rate_mean+gdp_mean*uer_mean+ risk_free_mean+ hpi_mean+  FICO_orig_time+ hpi_mean, test.data)[,-1]
+probabilities <- model %>% predict(newx = x.test)
+predicted.classes <- ifelse(probabilities > 0.5, "default", "payback")
+library(glmnet)
+set.seed(123)
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+plot(cv.lasso)
+```
+
+
+```{r}
+cv.lasso$lambda.min
+cv.lasso$lambda.1se
+coef(cv.lasso, cv.lasso$lambda.min)
+##Using lambda.1se as the best lambda, gives the following regression coefficients:
+coef(cv.lasso, cv.lasso$lambda.1se)
+```
+
+
+```{r}
+# Final model with lambda.min
+lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
+                      lambda = cv.lasso$lambda.min)
+# Make prediction on test data
+x.test <- model.matrix(default_time ~ age + TTM+ last_time+ status_last+ interest_rate_mean+gdp_mean*uer_mean+ risk_free_mean+ hpi_mean+  FICO_orig_time+ hpi_mean, test.data)[,-1]
+probabilities <- lasso.model %>% predict(newx = x.test)
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Model accuracy
+observed.classes <- test.data$default_time
+mean(predicted.classes == observed.classes)
+
+```
+
+
+```{r}
+# Final model with lambda.1se
+lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
+                      lambda = cv.lasso$lambda.1se)
+# Make prediction on test data
+x.test <- model.matrix(default_time ~ age + TTM+ last_time+ status_last+ interest_rate_mean+gdp_mean*uer_mean+ risk_free_mean+ hpi_mean+  FICO_orig_time+ hpi_mean,  test.data)[,-1]
+probabilities <- lasso.model %>% predict(newx = x.test)
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Model accuracy rate
+observed.classes <- test.data$default_time
+mean(predicted.classes == observed.classes)
+
+
+```
+
+
+```{r}
+# Fit the model
+
+ 
+full.model <- glm(default_time ~ age + TTM+ last_time+ status_last+ interest_rate_mean+gdp_mean*uer_mean+ risk_free_mean+ hpi_mean+  FICO_orig_time+ hpi_mean, data = train.data, family = binomial)
+# Make predictions
+probabilities <- full.model %>% predict(test.data, type = "response")
+
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Model accuracy
+observed.classes <- test.data$default_time
+mean(predicted.classes == observed.classes)
+
+```
+
+```{r}
+library(modelr)
+library(pROC)
+full.model
+mortgage_all <- mortgage_all %>% add_predictions(full.model, type = 'response')
+roc(mortgage_all$default_time,mortgage_all$pred,plot = TRUE)
+```

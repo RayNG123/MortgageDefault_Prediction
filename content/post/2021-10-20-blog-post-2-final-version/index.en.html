@@ -1,0 +1,161 @@
+---
+title: Exploring Data with insights
+author: Ke Lan
+date: '2021-10-20'
+slug: []
+categories: []
+tags: []
+description: Our primary methods of cleaning data
+toc: yes
+authors: []
+series: []
+lastmod: '2021-10-20T23:58:26-04:00'
+featuredVideo: ~
+featuredImage: ~
+---
+
+<script src="{{< blogdown/postref >}}index.en_files/header-attrs/header-attrs.js"></script>
+
+<div id="TOC">
+
+</div>
+
+<p>The blog posts together should address the following topics.
+Data Loading and Cleaning
+Discuss any initial steps you are taking to load and clean the data.</p>
+<pre class="r"><code>library(tidyverse)</code></pre>
+<pre><code>## ── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──</code></pre>
+<pre><code>## ✓ ggplot2 3.3.5     ✓ purrr   0.3.4
+## ✓ tibble  3.1.2     ✓ dplyr   1.0.7
+## ✓ tidyr   1.1.4     ✓ stringr 1.4.0
+## ✓ readr   2.0.1     ✓ forcats 0.5.1</code></pre>
+<pre><code>## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## x dplyr::filter() masks stats::filter()
+## x dplyr::lag()    masks stats::lag()</code></pre>
+<pre class="r"><code>salary &lt;-read_csv(&quot;Levels_Fyi_Salary_Data.csv&quot;, col_types=cols(
+  company = col_character(),
+  level = col_character(),
+  title = col_character(),
+  totalyearlycompensation = col_double(),
+  yearsatcompany = col_double(),
+  yearsofexperience = col_double(),
+  gender = col_character(),
+  Race = col_character(),
+  Education = col_character()))
+salary</code></pre>
+<pre><code>## # A tibble: 62,642 x 19
+##    timestamp  company  level title    totalyearlycomp… location yearsofexperien…
+##    &lt;chr&gt;      &lt;chr&gt;    &lt;chr&gt; &lt;chr&gt;               &lt;dbl&gt; &lt;chr&gt;               &lt;dbl&gt;
+##  1 6/7/2017 … Oracle   L3    Product…           127000 Redwood…              1.5
+##  2 6/10/2017… eBay     SE 2  Softwar…           100000 San Fra…              5  
+##  3 6/11/2017… Amazon   L7    Product…           310000 Seattle…              8  
+##  4 6/17/2017… Apple    M1    Softwar…           372000 Sunnyva…              7  
+##  5 6/20/2017… Microso… 60    Softwar…           157000 Mountai…              5  
+##  6 6/21/2017… Microso… 63    Softwar…           208000 Seattle…              8.5
+##  7 6/22/2017… Microso… 65    Softwar…           300000 Redmond…             15  
+##  8 6/22/2017… Microso… 62    Softwar…           156000 Seattle…              4  
+##  9 6/22/2017… Microso… 59    Softwar…           120000 Redmond…              3  
+## 10 6/26/2017… Microso… 63    Softwar…           201000 Seattle…             12  
+## # … with 62,632 more rows, and 12 more variables: yearsatcompany &lt;dbl&gt;,
+## #   tag &lt;chr&gt;, basesalary &lt;dbl&gt;, stockgrantvalue &lt;dbl&gt;, bonus &lt;dbl&gt;,
+## #   gender &lt;chr&gt;, otherdetails &lt;chr&gt;, cityid &lt;dbl&gt;, dmaid &lt;dbl&gt;,
+## #   rowNumber &lt;dbl&gt;, Race &lt;chr&gt;, Education &lt;chr&gt;</code></pre>
+<div id="our-methods-of-loading-data-is-described-above-and-variable-gender-race-education-contains-a-lot-of-missing-values-nas-and-we-want-to-plot-the-observation-of-these-three-variable-first-to-see-whether-missing-values-salary-has-large-skew-or-randomly-distributed.-if-it-is-randomly-distributed-we-will-drop-those-missing-values-and-if-it-is-largely-skewed-we-might-keep-them." class="section level2">
+<h2>our methods of loading data is described above, and variable Gender/ Race/ Education contains a lot of missing values (NAs) and we want to plot the observation of these three variable first to see whether missing values’ salary has large skew or randomly distributed. If it is randomly distributed, we will drop those missing values and if it is largely skewed we might keep them.</h2>
+</div>
+<div id="if-you-are-working-with-a-large-data-set-you-might-decide-to-start-with-a-subset-of-the-data.-how-did-you-choose-this" class="section level1">
+<h1>If you are working with a large data set, you might decide to start with a subset of the data. How did you choose this?</h1>
+<pre class="r"><code>salary %&gt;% mutate(random = runif(62642,1.0,10000.0)) %&gt;% filter(random &lt; 30)</code></pre>
+<pre><code>## # A tibble: 148 x 20
+##    timestamp  company  level   title  totalyearlycomp… location yearsofexperien…
+##    &lt;chr&gt;      &lt;chr&gt;    &lt;chr&gt;   &lt;chr&gt;             &lt;dbl&gt; &lt;chr&gt;               &lt;dbl&gt;
+##  1 9/8/2017 … Linkedin Softwa… Softw…           184000 San Fra…                5
+##  2 2/13/2018… Amazon   7       Produ…           190000 Seattle…               10
+##  3 5/20/2018… Microso… L60     Softw…           155500 Redmond…                2
+##  4 7/15/2018… Cisco    10      Softw…           180000 San Jos…               13
+##  5 7/25/2018… IBM      Band 8  Softw…           125000 Austin,…                6
+##  6 9/16/2018… Amazon   SDE II  Softw…           250000 Seattle…                5
+##  7 9/27/2018… Amazon   L6      Softw…           247000 Seattle…               10
+##  8 9/29/2018… Amazon   L5      Softw…           170000 Seattle…                5
+##  9 10/14/201… Microso… 59      Softw…           159000 Seattle…                1
+## 10 10/27/201… Qualcomm Staff … Softw…           180000 San Die…               10
+## # … with 138 more rows, and 13 more variables: yearsatcompany &lt;dbl&gt;, tag &lt;chr&gt;,
+## #   basesalary &lt;dbl&gt;, stockgrantvalue &lt;dbl&gt;, bonus &lt;dbl&gt;, gender &lt;chr&gt;,
+## #   otherdetails &lt;chr&gt;, cityid &lt;dbl&gt;, dmaid &lt;dbl&gt;, rowNumber &lt;dbl&gt;, Race &lt;chr&gt;,
+## #   Education &lt;chr&gt;, random &lt;dbl&gt;</code></pre>
+<div id="i-use-a-random-number-generator-because-i-do-not-want-my-subset-to-be-biased-and-stratified." class="section level2">
+<h2>I use a random number generator because I do not want my subset to be biased and stratified.</h2>
+<p>Are you starting by removing missing values or focusing on columns with less missing data?</p>
+</div>
+<div id="our-methods-of-loading-data-is-described-above-and-variable-gender-race-education-contains-a-lot-of-missing-values-nas-and-we-want-to-plot-the-observation-of-these-three-variable-first-to-see-whether-missing-values-salary-has-large-skew-or-randomly-distributed.-if-it-is-randomly-distributed-we-will-drop-those-missing-values-and-if-it-is-largely-skewed-we-might-keep-them.-1" class="section level2">
+<h2>our methods of loading data is described above, and variable Gender/ Race/ Education contains a lot of missing values (NAs) and we want to plot the observation of these three variable first to see whether missing values’ salary has large skew or randomly distributed. If it is randomly distributed, we will drop those missing values and if it is largely skewed we might keep them.</h2>
+</div>
+<div id="moreover-we-will-drop-any-company-with-less-than-30-observations.-and-extreme-value-of-salary" class="section level2">
+<h2>Moreover we will drop any company with less than 30 observations. and extreme value of salary</h2>
+<pre class="r"><code>salary %&gt;% group_by(company) %&gt;% summarize(count = n()) %&gt;% filter(count &lt; 30) </code></pre>
+<pre><code>## # A tibble: 1,403 x 2
+##    company      count
+##    &lt;chr&gt;        &lt;int&gt;
+##  1 10x Genomics     6
+##  2 23andMe          7
+##  3 2U               7
+##  4 3m               3
+##  5 3M              21
+##  6 7-eleven         1
+##  7 7-Eleven         4
+##  8 8x8              7
+##  9 ABB              7
+## 10 Abbott          16
+## # … with 1,393 more rows</code></pre>
+<pre class="r"><code>salary &lt;-salary %&gt;% arrange (desc(totalyearlycompensation)) %&gt;% filter(totalyearlycompensation &lt; 3000000) %&gt;% filter(!company %in% c(&quot;10x Genomics&quot;, &quot;23andMe&quot;, &quot;2U&quot;,&quot;3m&quot;,&quot;3M&quot;,&quot;7-eleven&quot;, &quot;7-Eleven&quot;,&quot;8x8&quot;,&quot;ABB&quot;,&quot;abbott&quot;))
+salary</code></pre>
+<pre><code>## # A tibble: 62,575 x 19
+##    timestamp  company  level  title   totalyearlycomp… location yearsofexperien…
+##    &lt;chr&gt;      &lt;chr&gt;    &lt;chr&gt;  &lt;chr&gt;              &lt;dbl&gt; &lt;chr&gt;               &lt;dbl&gt;
+##  1 9/28/2019… Snap     L8     Softwa…          2500000 Los Ang…               20
+##  2 5/18/2021… Facebook D1     Softwa…          2372000 Menlo P…               22
+##  3 4/19/2021… Facebook D1     Softwa…          2200000 Menlo P…               20
+##  4 5/8/2020 … SoFi     EVP    Softwa…          2000000 San Fra…               20
+##  5 8/18/2020… Google   L8     Softwa…          1950000 Mountai…               21
+##  6 6/24/2021… Uber     Sr Di… Produc…          1900000 San Fra…               23
+##  7 1/31/2021… Google   L9     Softwa…          1870000 Mountai…               21
+##  8 5/4/2019 … Microso… 68     Produc…          1800000 Seattle…               24
+##  9 6/26/2019… Facebook D2     Produc…          1755000 Menlo P…               25
+## 10 9/16/2018… Microso… 69     Softwa…          1750000 Seattle…               27
+## # … with 62,565 more rows, and 12 more variables: yearsatcompany &lt;dbl&gt;,
+## #   tag &lt;chr&gt;, basesalary &lt;dbl&gt;, stockgrantvalue &lt;dbl&gt;, bonus &lt;dbl&gt;,
+## #   gender &lt;chr&gt;, otherdetails &lt;chr&gt;, cityid &lt;dbl&gt;, dmaid &lt;dbl&gt;,
+## #   rowNumber &lt;dbl&gt;, Race &lt;chr&gt;, Education &lt;chr&gt;</code></pre>
+<p>Exploratory Data Analysis
+Talk about your initial exploration of the data. Give summary statistics and make plots about parts of the data that will be your focus.</p>
+<pre class="r"><code>salary %&gt;% arrange(desc(totalyearlycompensation)) %&gt;% filter(totalyearlycompensation &lt; 3000000)</code></pre>
+<pre><code>## # A tibble: 62,575 x 19
+##    timestamp  company  level  title   totalyearlycomp… location yearsofexperien…
+##    &lt;chr&gt;      &lt;chr&gt;    &lt;chr&gt;  &lt;chr&gt;              &lt;dbl&gt; &lt;chr&gt;               &lt;dbl&gt;
+##  1 9/28/2019… Snap     L8     Softwa…          2500000 Los Ang…               20
+##  2 5/18/2021… Facebook D1     Softwa…          2372000 Menlo P…               22
+##  3 4/19/2021… Facebook D1     Softwa…          2200000 Menlo P…               20
+##  4 5/8/2020 … SoFi     EVP    Softwa…          2000000 San Fra…               20
+##  5 8/18/2020… Google   L8     Softwa…          1950000 Mountai…               21
+##  6 6/24/2021… Uber     Sr Di… Produc…          1900000 San Fra…               23
+##  7 1/31/2021… Google   L9     Softwa…          1870000 Mountai…               21
+##  8 5/4/2019 … Microso… 68     Produc…          1800000 Seattle…               24
+##  9 6/26/2019… Facebook D2     Produc…          1755000 Menlo P…               25
+## 10 9/16/2018… Microso… 69     Softwa…          1750000 Seattle…               27
+## # … with 62,565 more rows, and 12 more variables: yearsatcompany &lt;dbl&gt;,
+## #   tag &lt;chr&gt;, basesalary &lt;dbl&gt;, stockgrantvalue &lt;dbl&gt;, bonus &lt;dbl&gt;,
+## #   gender &lt;chr&gt;, otherdetails &lt;chr&gt;, cityid &lt;dbl&gt;, dmaid &lt;dbl&gt;,
+## #   rowNumber &lt;dbl&gt;, Race &lt;chr&gt;, Education &lt;chr&gt;</code></pre>
+<pre class="r"><code>salary %&gt;% arrange(desc(totalyearlycompensation)) %&gt;% filter(totalyearlycompensation &lt; 3000000)%&gt;% ggplot(aes(x = gender, y = totalyearlycompensation)) + geom_boxplot()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-1.png" width="672" /></p>
+<pre class="r"><code>salary%&gt;% arrange(desc(totalyearlycompensation)) %&gt;% filter(totalyearlycompensation &lt; 3000000) %&gt;% ggplot(aes(x = Race, y = totalyearlycompensation)) + geom_boxplot()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-2.png" width="672" /></p>
+<pre class="r"><code>salary %&gt;% arrange(desc(totalyearlycompensation)) %&gt;% filter(totalyearlycompensation &lt; 3000000)%&gt;% ggplot(aes(x = Education, y = totalyearlycompensation)) + geom_boxplot()</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-3.png" width="672" /></p>
+<pre class="r"><code>salary %&gt;% arrange(desc(totalyearlycompensation)) %&gt;% filter(totalyearlycompensation &lt; 3000000)%&gt;% ggplot(aes(x = yearsofexperience, y = yearsatcompany)) + geom_smooth()</code></pre>
+<pre><code>## `geom_smooth()` using method = &#39;gam&#39; and formula &#39;y ~ s(x, bs = &quot;cs&quot;)&#39;</code></pre>
+<p><img src="{{< blogdown/postref >}}index.en_files/figure-html/unnamed-chunk-4-4.png" width="672" />
+What are the big, obvious patterns in the data? Are these surprising?
+## no big difference between NA and other categories in these three variables, and we observed a strong correlation between years of experience and years at company, the correlation need to be addressed…,,,,,</p>
+</div>
+</div>

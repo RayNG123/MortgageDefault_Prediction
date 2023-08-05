@@ -1,0 +1,100 @@
+---
+title: Further Model Selection and Combining Dataset
+author: Yusen Wu
+date: '2021-11-15'
+slug: []
+categories: []
+tags: []
+description: more about model selection and we will add more variables from other datasets to our model
+toc: yes
+authors: []
+series: []
+lastmod: '2021-11-15T09:45:54-05:00'
+featuredVideo: ~
+featuredImage: ~
+---
+## This week we will do more about model selection and we will add more variables from other datasets to our model.
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(formattable)
+mortgage <-read_csv(here::here('dataset','dcr_clean.csv'))
+mortgage$age<- mortgage$time-mortgage$orig_time
+mortgage$TTM<-mortgage$mat_time-mortgage$orig_time
+mortgage$date=paste(as.character(mortgage$year),as.character(mortgage$month),as.character(mortgage$day),sep='-')
+mortgage_first<-mortgage[match(unique(mortgage$id), mortgage$id),]
+mortgage_first$first_time_date<-mortgage_first$date
+mortgage_first$first_time<-mortgage_first$time
+first <- mortgage_first %>% select(id, first_time, orig_time,mat_time,rate_time,REtype_CO_orig_time,REtype_PU_orig_time,REtype_SF_orig_time,investor_orig_time,balance_orig_time:Interest_Rate_orig_time,state_orig_time,hpi_orig_time,first_time_date, age, TTM)
+
+get_last <- mortgage %>% select(id,date,time,default_time,payoff_time,status_time) %>% group_by(id) %>% summarise_all(last)
+get_last$last_time_date<-get_last$date
+get_last$last_time<-get_last$time
+get_last$status_last<-get_last$status_time
+atlast <- get_last %>% select(id,last_time_date:status_last,default_time)
+meanvalue <- mortgage %>% group_by(id) %>% summarise(interest_rate_mean = mean(interest_rate_time),gdp_mean = mean(gdp_time), risk_free_mean = mean(rate_time),hpi_mean = mean(hpi_time),uer_mean = mean(uer_time))
+mortgage_all <- first %>% left_join(atlast, by = 'id') %>% left_join(meanvalue, by = 'id')
+mortgage_all$time_to_GFC <- 37-mortgage_all$first_time
+```
+
+```{r}
+library(tidyverse)
+library(caret)
+mortgage_select <- mortgage_all %>% select(default_time,rate_time,first_time,gdp_mean,gdp_mean,hpi_orig_time,FICO_orig_time,TTM,interest_rate_mean,age,risk_free_mean)
+```
+
+```{r}
+## 普通stepwise
+fullmod = glm(default_time ~.,data = mortgage_select,family=binomial)
+summary(fullmod)
+nothing <- glm(default_time ~ 1,data = mortgage_select,family=binomial)
+summary(nothing)
+redmod1 = glm(default_time ~.,data = mortgage_select,family=binomial) 
+backwards = step(fullmod)
+formula(backwards)
+
+summary(backwards)
+
+back2=glm (default_time ~. - rate_time,data = mortgage_select,family=binomial)
+summary(back2)
+
+```
+
+```{r}
+forwards = step(nothing, scope=list(default=formula(nothing),upper=formula(fullmod)), direction="forward")
+
+```
+ 
+```{r}
+
+formula(redmod1)
+formula(backwards)
+formula(forwards)
+library(pROC)
+library(tidyverse)
+library(modelr)
+mortgage_all <- mortgage_all %>% add_predictions(backwards, type = 'response')
+roc(mortgage_all$default_time,mortgage_all$pred,plot = TRUE)
+```
+
+
+```{r}
+library(pROC)
+model <- glm(default_time ~ age + first_time+REtype_SF_orig_time+interest_rate_mean+gdp_mean+rate_time+hpi_orig_time+uer_mean+investor_orig_time+FICO_orig_time+LTV_orig_time+TTM , data = mortgage_all, family = binomial) 
+mortgage_all <- mortgage_all %>% add_predictions(model, type = 'response')
+roc(mortgage_all$default_time,mortgage_all$pred,plot = TRUE)
+fit <-  leaps::regsubsets(default_time ~ age + first_time+REtype_SF_orig_time+interest_rate_mean+gdp_mean+rate_time+hpi_orig_time+uer_mean+investor_orig_time+FICO_orig_time+LTV_orig_time+TTM, method = "forward",data= mortgage_all, nvmax = 10)
+summary(fit)$which
+summary(fit)$bic
+summary(fit)$cp
+summary(fit)$rsq
+
+```
+
+
+
+
+
+

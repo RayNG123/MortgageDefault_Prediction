@@ -1,0 +1,33 @@
+---
+title: "interactive tables"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(shiny)
+mortgage <-read_csv(here::here('dataset','dcr_clean.csv'))
+year <- mortgage %>% pull(year) %>% unique() %>% sort()
+
+which_count <- c("default", "payback")
+ui <- fluidPage(
+    titlePanel("Mortgage"),
+    sliderInput(inputId = "year", label = "Year", 2000,2014,2000),
+    selectInput(inputId= "which", label = "Count", choices = which_count),
+    plotOutput("distPlot")
+)
+server <- function(input, output) {
+    output$distPlot <- renderPlot({
+       mortgage %>%  filter(year == input$year) %>% filter(status_time == ifelse(input$which == "default", 1, 2)) %>% group_by(state_orig_time) %>% summarize(count = n(),balance = sum(balance_orig_time)) %>% mutate(balance = balance/100000)  %>% 
+            ggplot(aes(x = reorder(state_orig_time, desc(balance)), y = balance,size = count)) +
+            geom_point(color = "cornflowerblue",
+             alpha = 6) + labs(x = "state", y = "balance(in million)", size = "number of people")
+    })
+}
+shinyApp(ui = ui, server = server)
+
+```
+Column {data-width=650}
+-----------------------------------------------------------------------

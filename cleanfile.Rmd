@@ -1,0 +1,55 @@
+---
+title: "clean file"
+author: "ke lan"
+date: "11/5/2021"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+dcrfull <- read_csv(here::here('dataset/dcr_full.csv'), col_types=cols(
+  id = col_double(),
+  time = col_double(),
+  orig_time = col_double(),
+  first_time = col_double(),
+  mat_time = col_double(),
+  res_time = col_double(),
+  balance_time = col_double(),
+  LTV_time = col_double(),
+  interest_rate_time = col_double(),
+  rate_time = col_double(),
+  hpi_time = col_double(),
+  gdp_time = col_double(),
+  uer_time = col_double(),
+  REtype_CO_orig_time = col_double(),
+  REtype_SF_orig_time = col_double(),
+  investor_orig_time = col_double(),
+  balance_orig_time = col_double(),
+  FICO_orig_time = col_double(),
+  LTV_orig_time = col_double(),
+  Interest_Rate_orig_time = col_double(),
+  state_orig_time = col_character(),
+  hpi_orig_time = col_double(),
+  default_time = col_double(),
+  payoff_time = col_double(),
+  status_time = col_character()
+))
+
+dcrfull1 <- dcrfull %>% filter(!is.na(state_orig_time))
+
+date_seq<-seq(as.Date("2000/03/31"), by = "quarter", length.out = 60)
+date_dataframe<-data.frame(date_seq)
+date_dataframe<- date_dataframe%>%separate(date_seq,into=c('year','month','day'),sep='-')
+date_dataframe$quater=1
+date_dataframe$quater[date_dataframe$month=='07']<-2
+date_dataframe$quater[date_dataframe$month=='10']<-3
+date_dataframe$quater[date_dataframe$month=='12']<-4
+date_dataframe$time<-seq(1,60,1)
+dcrfull2 <- dcrfull1 %>% left_join(date_dataframe, by = "time")
+
+mortgage <- dcrfull2
+
+write_csv(mortgage, file = here::here('shiny_app','dcr_clean.csv'))
+
+
+```
