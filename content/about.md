@@ -43,7 +43,7 @@ Yusen Wu and Ke Lan collectively contributed to weekly posts.
 * EDA Analysis Page: Yusen Wu, Ke Lan 
 * Data Page: Ke Lan
 * Big Picture: Yusen Wu 90%
-* Interactive Page: Ke Lan
+* Interactive Page: Ke Lan, Yusen Wu
 * Load_and_clean_data_file summarization: Yusen Wu
 * Posts: Ke Lan 50% Yusen Wu 50%
 
