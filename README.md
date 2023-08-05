@@ -1,5 +1,4 @@
-# MA[46]15 Final Project
-
+# 2001-2016 US Mortgage Default Behaviour Analysis and Prediction
 
 [video](https://docs.google.com/presentation/d/1BRoXbCBnPDwEHGi_m7FJqLQkvb-KpSr-pgrMn6GQpqY/edit#slide=id.p)
 
